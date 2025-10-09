@@ -10,7 +10,7 @@ from reportlab.lib.pagesizes import letter
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "Liam2205@.")
 
-DB_URL = os.environ.get("postgresql://mantenimiento_db_p9pq_user:O2Q9Ei3T4t24cpRXUMHRE1KoGNEkvCpT@dpg-d3k1347diees738refk0-a.oregon-postgres.render.com/mantenimiento_db_p9pq")
+DB_URL = os.environ.get('DATABASE_URL')
 if not DB_URL:
     raise ValueError("Debes configurar DATABASE_URL como variable de entorno con la URL de PostgreSQL de Render")
 
