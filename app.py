@@ -284,43 +284,6 @@ def generar_acta(rid):
         download_name=f"Acta_Registro_{registro['id']}.pdf",
         mimetype='application/pdf'
     )
-✅ Mejoras que trae:
-Campos en negrita para los títulos (ID, Sede, Observaciones, etc.).
-
-Texto largo ajustado automáticamente usando textwrap.wrap.
-
-Espaciado limpio y consistente.
-
-Nueva página automática si el texto se sale del margen.
-
-Si quieres, puedo hacer una versión aún más profesional con cuadros y líneas tipo tabla, que se vea como un acta oficial, donde cada campo esté en su celda. Esto hace que la observación larga también se vea ordenada y no ocupe desordenadamente la página.
-
-¿Quieres que haga esa versión tipo acta oficial?
-
-
-
-
-
-
-
-Ramificado desde Hilo · Hilo · Convertir app local a web
-
-Tú dijiste:
-Si y creala enseguida en el app.py
-
-
-ChatGPT Plus
-Perfecto 😎. Vamos a crear la versión tipo acta profesional, con cuadros y líneas, lista para reemplazar la función generar_acta en tu app.py. Esto hará que incluso las observaciones largas queden bien alineadas y no se desborden.
-
-Aquí tienes la función lista:
-
-python
-Copiar código
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.lib import colors
-from io import BytesIO
-import textwrap
 
 @app.route('/acta/<int:rid>')
 def generar_acta(rid):
