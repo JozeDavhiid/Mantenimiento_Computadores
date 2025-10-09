@@ -315,6 +315,40 @@ def generar_acta(rid):
         mimetype='application/pdf'
     )
 
+@app.route('/consultar')
+def consultar():
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db()
+    c = conn.cursor()
+
+    # Búsqueda y filtro (igual que principal)
+    search = request.args.get('q','').strip()
+    sede_filter = request.args.get('sede','Todas')
+    query = "SELECT * FROM mantenimiento WHERE 1=1"
+    params = []
+    if search:
+        like = f"%{search}%"
+        query += """ AND (sede ILIKE %s OR area ILIKE %s OR tecnico ILIKE %s OR nombre_maquina ILIKE %s 
+                     OR usuario ILIKE %s OR tipo_equipo ILIKE %s OR marca ILIKE %s OR modelo ILIKE %s 
+                     OR serial ILIKE %s OR sistema_operativo ILIKE %s OR office ILIKE %s OR antivirus ILIKE %s 
+                     OR compresor ILIKE %s OR control_remoto ILIKE %s OR activo_fijo ILIKE %s OR observaciones ILIKE %s)"""
+        params += [like]*16
+    if sede_filter and sede_filter != 'Todas':
+        query += " AND sede = %s"
+        params.append(sede_filter)
+    query += " ORDER BY id DESC"
+    c.execute(query, params)
+    registros = c.fetchall()
+    conn.close()
+
+    sedes = ["Todas","Nivel Central","Barranquilla","Soledad","Santa Marta","El Banco",
+             "Monteria","Sincelejo","Valledupar","El Carmen de Bolivar","Magangue"]
+
+    return render_template('consultar.html', registros=registros, sedes=sedes,
+                           search=search, sede_filter=sede_filter, nombre=session.get('nombre'))
+
 # -----------------------
 # Main
 # -----------------------
