@@ -7,6 +7,11 @@ from datetime import date
 import openpyxl
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from io import BytesIO
+import textwrap
 
 # -----------------------
 # Configuración
@@ -242,26 +247,166 @@ def generar_acta(rid):
     buffer = BytesIO()
     c_pdf = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
-    c_pdf.setFont("Helvetica", 12)
-
+    c_pdf.setFont("Helvetica-Bold", 14)
     y = height - 50
+
+    # Título
     c_pdf.drawString(50, y, f"Acta de Mantenimiento - Registro ID: {registro['id']}")
-    y -= 25
+    y -= 30
+    c_pdf.setFont("Helvetica-Bold", 12)
+
+    # Dibujar cada campo
     for key, value in registro.items():
-        c_pdf.drawString(50, y, f"{key.replace('_',' ').title()}: {value}")
-        y -= 20
-        if y < 50:
-            c_pdf.showPage()
+        field_title = f"{key.replace('_',' ').title()}:"
+        text = str(value)
+
+        # Dibujamos título en negrita
+        c_pdf.drawString(50, y, field_title)
+        y -= 15
+
+        # Dividimos texto largo en líneas de máximo 80 caracteres
+        for line in textwrap.wrap(text, width=80):
             c_pdf.setFont("Helvetica", 12)
-            y = height - 50
+            c_pdf.drawString(70, y, line)
+            y -= 15
+            if y < 50:  # Nueva página si se acaba el espacio
+                c_pdf.showPage()
+                y = height - 50
+                c_pdf.setFont("Helvetica-Bold", 12)
 
     c_pdf.showPage()
     c_pdf.save()
     buffer.seek(0)
 
-    return send_file(buffer, as_attachment=True,
-                     download_name=f"Acta_Registro_{registro['id']}.pdf",
-                     mimetype='application/pdf')
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"Acta_Registro_{registro['id']}.pdf",
+        mimetype='application/pdf'
+    )
+✅ Mejoras que trae:
+Campos en negrita para los títulos (ID, Sede, Observaciones, etc.).
+
+Texto largo ajustado automáticamente usando textwrap.wrap.
+
+Espaciado limpio y consistente.
+
+Nueva página automática si el texto se sale del margen.
+
+Si quieres, puedo hacer una versión aún más profesional con cuadros y líneas tipo tabla, que se vea como un acta oficial, donde cada campo esté en su celda. Esto hace que la observación larga también se vea ordenada y no ocupe desordenadamente la página.
+
+¿Quieres que haga esa versión tipo acta oficial?
+
+
+
+
+
+
+
+Ramificado desde Hilo · Hilo · Convertir app local a web
+
+Tú dijiste:
+Si y creala enseguida en el app.py
+
+
+ChatGPT Plus
+Perfecto 😎. Vamos a crear la versión tipo acta profesional, con cuadros y líneas, lista para reemplazar la función generar_acta en tu app.py. Esto hará que incluso las observaciones largas queden bien alineadas y no se desborden.
+
+Aquí tienes la función lista:
+
+python
+Copiar código
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from io import BytesIO
+import textwrap
+
+@app.route('/acta/<int:rid>')
+def generar_acta(rid):
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM mantenimiento WHERE id=%s", (rid,))
+    registro = c.fetchone()
+    conn.close()
+
+    if not registro:
+        flash('Registro no encontrado', 'warning')
+        return redirect(url_for('principal'))
+
+    buffer = BytesIO()
+    c_pdf = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+
+    # Margenes y posiciones
+    x_margin = 50
+    y = height - 50
+    line_height = 18
+    box_padding = 5
+    c_pdf.setFont("Helvetica-Bold", 16)
+
+    # Título
+    c_pdf.drawCentredString(width/2, y, f"Acta de Mantenimiento - Registro ID: {registro['id']}")
+    y -= 40
+    c_pdf.setFont("Helvetica-Bold", 12)
+
+    # Campos a mostrar
+    campos = [
+        ('Sede', registro['sede']),
+        ('Fecha', registro['fecha']),
+        ('Área', registro['area']),
+        ('Técnico', registro['tecnico']),
+        ('Nombre Máquina', registro['nombre_maquina']),
+        ('Usuario', registro['usuario']),
+        ('Tipo Equipo', registro['tipo_equipo']),
+        ('Marca', registro['marca']),
+        ('Modelo', registro['modelo']),
+        ('Serial', registro['serial']),
+        ('Sistema Operativo', registro['sistema_operativo']),
+        ('Office', registro['office']),
+        ('Antivirus', registro['antivirus']),
+        ('Compresor', registro['compresor']),
+        ('Control Remoto', registro['control_remoto']),
+        ('Activo Fijo', registro['activo_fijo']),
+        ('Observaciones', registro['observaciones'])
+    ]
+
+    # Dibujar cada campo en un cuadro
+    for titulo, valor in campos:
+        if y < 80:  # Nueva página si se acaba el espacio
+            c_pdf.showPage()
+            y = height - 50
+            c_pdf.setFont("Helvetica-Bold", 12)
+
+        # Título del campo
+        c_pdf.setFont("Helvetica-Bold", 12)
+        c_pdf.drawString(x_margin, y, titulo + ":")
+        y -= line_height
+
+        # Valor del campo, ajustando líneas largas
+        c_pdf.setFont("Helvetica", 12)
+        for line in textwrap.wrap(str(valor), width=90):
+            c_pdf.drawString(x_margin + 15, y, line)
+            y -= line_height
+
+        # Línea separadora
+        c_pdf.setStrokeColor(colors.grey)
+        c_pdf.line(x_margin, y + box_padding, width - x_margin, y + box_padding)
+        y -= 10
+
+    c_pdf.showPage()
+    c_pdf.save()
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"Acta_Registro_{registro['id']}.pdf",
+        mimetype='application/pdf'
+    )
 
 # -----------------------
 # Main
