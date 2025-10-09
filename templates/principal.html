@@ -31,28 +31,26 @@
     <!-- FORMULARIO DE REGISTRO -->
     <form method="POST" class="row g-3 mb-4">
         <input type="hidden" name="action" value="guardar">
+
         <div class="col-md-3">
             <label>Sede</label>
-                <select name="sede" class="form-select">
-                <option>Nivel Central</option>
-                <option>Barranquilla</option>
-                <option>Soledad</option>
-                <option>Santa Marta</option>
-                <option>El Banco</option>
-                <option>Monteria</option>
-                <option>Sincelejo</option>
-                <option>El Carmen de Bolivar</option>
-                <option>Magangue</option>
+            <select name="sede" class="form-select">
+                {% for s in sedes if s != 'Todas' %}
+                <option>{{ s }}</option>
+                {% endfor %}
             </select>
         </div>
+
         <div class="col-md-3">
             <label>Fecha</label>
             <input type="date" name="fecha" class="form-control" value="{{ hoy }}">
         </div>
+
         <div class="col-md-3">
             <label>Área</label>
             <input type="text" name="area" class="form-control">
         </div>
+
         <div class="col-md-3">
             <label>Nombre Máquina</label>
             <input type="text" name="nombre_maquina" class="form-control">
@@ -62,6 +60,7 @@
             <label>Usuario Equipo</label>
             <input type="text" name="usuario_equipo" class="form-control">
         </div>
+
         <div class="col-md-3">
             <label>Tipo de Equipo</label>
             <select name="tipo_equipo" class="form-select">
@@ -72,10 +71,12 @@
                 <option>Otro</option>
             </select>
         </div>
+
         <div class="col-md-3">
             <label>Marca</label>
             <input type="text" name="marca" class="form-control">
         </div>
+
         <div class="col-md-3">
             <label>Modelo</label>
             <input type="text" name="modelo" class="form-control">
@@ -85,6 +86,7 @@
             <label>Serial</label>
             <input type="text" name="serial" class="form-control">
         </div>
+
         <div class="col-md-3">
             <label>Sistema Operativo</label>
             <select name="so" class="form-select">
@@ -94,21 +96,23 @@
                 <option>MacOS</option>
             </select>
         </div>
+
         <div class="col-md-3">
             <label>Office</label>
             <select name="office" class="form-select">
                 <option>Microsoft Office 2013</option>
-                <option>Microsoft Office 365</option>
                 <option>Microsoft Office 2016</option>
                 <option>Microsoft Office 2019</option>
                 <option>Microsoft Office 2021</option>
+                <option>Microsoft Office 365</option>
                 <option>No Instalado</option>
             </select>
         </div>
+
         <div class="col-md-3">
             <label>Antivirus</label>
             <select name="antivirus" class="form-select">
-                <option>Kaspesky Endpoint</option>
+                <option>Kaspersky Endpoint</option>
                 <option>Windows Defender</option>
                 <option>Avast</option>
                 <option>No Instalado</option>
@@ -123,6 +127,7 @@
                 <option>PeaZip</option>
             </select>
         </div>
+
         <div class="col-md-3">
             <label>Control Remoto</label>
             <select name="control_remoto" class="form-select">
@@ -132,10 +137,12 @@
                 <option>No Instalado</option>
             </select>
         </div>
+
         <div class="col-md-3">
             <label>Activo Fijo</label>
             <input type="text" name="activo_fijo" class="form-control">
         </div>
+
         <div class="col-md-3">
             <label>Observaciones</label>
             <input type="text" name="observaciones" class="form-control">
@@ -167,7 +174,6 @@
                 <td>{{ r.tecnico }}</td>
                 <td>{{ r.nombre_maquina }}</td>
                 <td>
-                    <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-info btn-sm">Ver</a>
                     <form action="{{ url_for('eliminar', rid=r.id) }}" method="POST" style="display:inline;">
                         <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
                     </form>
