@@ -247,62 +247,6 @@ def generar_acta(rid):
     buffer = BytesIO()
     c_pdf = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
-    c_pdf.setFont("Helvetica-Bold", 14)
-    y = height - 50
-
-    # Título
-    c_pdf.drawString(50, y, f"Acta de Mantenimiento - Registro ID: {registro['id']}")
-    y -= 30
-    c_pdf.setFont("Helvetica-Bold", 12)
-
-    # Dibujar cada campo
-    for key, value in registro.items():
-        field_title = f"{key.replace('_',' ').title()}:"
-        text = str(value)
-
-        # Dibujamos título en negrita
-        c_pdf.drawString(50, y, field_title)
-        y -= 15
-
-        # Dividimos texto largo en líneas de máximo 80 caracteres
-        for line in textwrap.wrap(text, width=80):
-            c_pdf.setFont("Helvetica", 12)
-            c_pdf.drawString(70, y, line)
-            y -= 15
-            if y < 50:  # Nueva página si se acaba el espacio
-                c_pdf.showPage()
-                y = height - 50
-                c_pdf.setFont("Helvetica-Bold", 12)
-
-    c_pdf.showPage()
-    c_pdf.save()
-    buffer.seek(0)
-
-    return send_file(
-        buffer,
-        as_attachment=True,
-        download_name=f"Acta_Registro_{registro['id']}.pdf",
-        mimetype='application/pdf'
-    )
-
-@app.route('/acta/<int:rid>')
-def generar_acta(rid):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
-
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT * FROM mantenimiento WHERE id=%s", (rid,))
-    registro = c.fetchone()
-    conn.close()
-
-    if not registro:
-        flash('Registro no encontrado', 'warning')
-        return redirect(url_for('principal'))
-
-    buffer = BytesIO()
-    c_pdf = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
 
     # Margenes y posiciones
     x_margin = 50
