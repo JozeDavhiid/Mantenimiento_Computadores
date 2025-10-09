@@ -2,364 +2,216 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Gestión de Mantenimientos</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="#">Mantenimiento de Computadores</a>
-  </div>
-</nav><!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Mantenimiento</title>
+    <title>Principal - Mantenimiento</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body {
-            background-color: #f8f9fa;
-        }
-        .navbar {
-            background-color: #0d6efd;
-        }
-        .navbar-brand {
-            color: #fff !important;
-            font-weight: bold;
-        }
-        .container {
-            margin-top: 40px;
-        }
-        .card {
-            border-radius: 12px;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.1);
-        }
-        .form-control, .form-select {
-            border-radius: 8px;
-        }
-        table {
-            margin-top: 20px;
-        }
-    </style>
 </head>
 <body>
-
-    <nav class="navbar navbar-expand-lg">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="#">Gestión de Mantenimientos</a>
-        </div>
-    </nav>
-
-    <div class="container">
-        <div class="card p-4">
-            <h4 class="mb-3 text-center text-primary">Registrar Mantenimiento</h4>
-
-            <form action="{{ url_for('registrar_mantenimiento') }}" method="POST">
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <label class="form-label">Fecha</label>
-                        <input type="date" class="form-control" name="fecha" required>
-                    </div>
-
-                    <div class="col-md-4">
-                        <label class="form-label">Sede</label>
-                        <input type="text" class="form-control" name="sede" required>
-                    </div>
-
-                    <div class="col-md-4">
-                        <label class="form-label">Usuario</label>
-                        <input type="text" class="form-control" name="usuario" required>
-                    </div>
-
-                    <div class="col-md-4">
-                        <label class="form-label">Tipo de equipo</label>
-                        <select class="form-select" name="tipo_equipo" required>
-                            <option value="">Seleccione...</option>
-                            <option>Portatil</option>
-                            <option>Impresora</option>
-                            <option>All in One</option>
-                            <option>Servidor</option>
-                            <option>Otro</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-4">
-                        <label class="form-label">Sistema operativo</label>
-                        <select class="form-select" name="sistema_operativo" required>
-                            <option value="">Seleccione...</option>
-                            <option>Windows 10 Pro 22H2</option>
-                            <option>Windows 11 Pro 23H2</option>
-                            <option>Windows 11 Pro 24H2</option>
-                            <option>MacOS</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-4">
-                        <label class="form-label">Office</label>
-                        <select class="form-select" name="office">
-                            <option value="">Seleccione...</option>
-                            <option>Microsoft Office 2013</option>
-                            <option>Microsoft Office 2016</option>
-                            <option>Microsoft Office 2019</option>
-                            <option>Microsoft Office 2021</option>
-                            <option>Microsoft Office 365</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-4">
-                        <label class="form-label">Antivirus</label>
-                        <select class="form-select" name="antivirus">
-                            <option value="">Seleccione...</option>
-                            <option>Kaspesky Endpoint</option>
-                            <option>Windows Defender</option>
-                            <option>Avast</option>
-                            <option>Otro</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-4">
-                        <label class="form-label">Compresor</label>
-                        <select class="form-select" name="compresor">
-                            <option value="">Seleccione...</option>
-                            <option>WinRAR</option>
-                            <option>7-Zip</option>
-                            <option>WinZip</option>
-                            <option>PeaZip</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-4">
-                        <label class="form-label">Control remoto</label>
-                        <select class="form-select" name="control_remoto">
-                            <option value="">Seleccione...</option>
-                            <option>Anydesk</option>
-                            <option>TeamViewer</option>
-                            <option>Chrome Remote</option>
-                            <option>Ninguno</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-12">
-                        <label class="form-label">Observaciones</label>
-                        <textarea class="form-control" name="observaciones" rows="3"></textarea>
-                    </div>
-                </div>
-
-                <div class="text-center mt-4">
-                    <button type="submit" class="btn btn-primary px-4">Guardar registro</button>
-                </div>
-            </form>
-        </div>
-
-        <div class="card p-4 mt-4">
-            <h4 class="text-center text-success">Registros guardados</h4>
-
-            <table class="table table-striped mt-3">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Fecha</th>
-                        <th>Sede</th>
-                        <th>Usuario</th>
-                        <th>Equipo</th>
-                        <th>SO</th>
-                        <th>Office</th>
-                        <th>Antivirus</th>
-                        <th>Compresor</th>
-                        <th>Control remoto</th>
-                        <th>Observaciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for m in mantenimientos %}
-                    <tr>
-                        <td>{{ m.id }}</td>
-                        <td>{{ m.fecha }}</td>
-                        <td>{{ m.sede }}</td>
-                        <td>{{ m.usuario }}</td>
-                        <td>{{ m.tipo_equipo }}</td>
-                        <td>{{ m.sistema_operativo }}</td>
-                        <td>{{ m.office }}</td>
-                        <td>{{ m.antivirus }}</td>
-                        <td>{{ m.compresor }}</td>
-                        <td>{{ m.control_remoto }}</td>
-                        <td>{{ m.observaciones }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-
-            <div class="text-end mt-3">
-                <a href="{{ url_for('exportar_excel') }}" class="btn btn-success">📥 Exportar a Excel</a>
-            </div>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="#">Mantenimiento</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <span class="navbar-text text-white me-3">Usuario: {{ nombre }}</span>
+                </li>
+                <li class="nav-item">
+                    <a class="btn btn-outline-light" href="{{ url_for('logout') }}">Cerrar sesión</a>
+                </li>
+            </ul>
         </div>
     </div>
+</nav>
 
-</body>
-</html>
+<div class="container mt-4">
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
 
-<div class="container mt-5">
-    <div class="card shadow-lg">
-        <div class="card-header bg-primary text-white">
-            <h5 class="mb-0">Registrar nuevo mantenimiento</h5>
+    <h2>Registro de Mantenimiento</h2>
+    <form method="POST" class="row g-3 mb-4">
+        <input type="hidden" name="action" value="guardar">
+        <div class="col-md-3">
+            <label class="form-label">Fecha</label>
+            <input type="date" class="form-control" name="fecha" value="{{ date.today() }}">
         </div>
-        <div class="card-body">
-            <form action="/registrar" method="post" class="row g-3">
-
-                <div class="col-md-4">
-                    <label for="fecha" class="form-label">Fecha</label>
-                    <input type="date" class="form-control" id="fecha" name="fecha" required>
-                </div>
-
-                <div class="col-md-4">
-                    <label for="sede" class="form-label">Sede</label>
-                    <input type="text" class="form-control" id="sede" name="sede" required>
-                </div>
-
-                <div class="col-md-4">
-                    <label for="tecnico" class="form-label">Técnico</label>
-                    <input type="text" class="form-control" id="tecnico" name="tecnico" required>
-                </div>
-
-                <div class="col-md-4">
-                    <label for="tipo_equipo" class="form-label">Tipo de equipo</label>
-                    <select class="form-select" id="tipo_equipo" name="tipo_equipo" required>
-                        <option value="">Seleccione...</option>
-                        <option>Portátil</option>
-                        <option>All in One</option>
-                        <option>Servidor</option>
-                        <option>Impresora</option>
-                        <option>Otro</option>
-                    </select>
-                </div>
-
-                <div class="col-md-4">
-                    <label for="sistema_operativo" class="form-label">Sistema operativo</label>
-                    <select class="form-select" id="sistema_operativo" name="sistema_operativo" required>
-                        <option value="">Seleccione...</option>
-                        <option>Windows 10 Pro 22H2</option>
-                        <option>Windows 11 Pro 24H2</option>
-                        <option>Windows 11 Pro 23H2</option>
-                        <option>Otro</option>
-                    </select>
-                </div>
-
-                <div class="col-md-4">
-                    <label for="office" class="form-label">Office</label>
-                    <select class="form-select" id="office" name="office" required>
-                        <option value="">Seleccione...</option>
-                        <option>Microsoft Office 2013</option>
-                        <option>Microsoft Office 2016</option>
-                        <option>Microsfot Office 2019</option>
-                        <option>Microsoft Office 2021</option>
-                        <option>Microsoft Office 365</option>
-                        <option>Otro</option>
-                    </select>
-                </div>
-
-                <div class="col-md-4">
-                    <label for="antivirus" class="form-label">Antivirus</label>
-                    <select class="form-select" id="antivirus" name="antivirus" required>
-                        <option>Kaspersky Endpoint</option>
-                        <option>Avast</option>
-                        <option>Windows Defender</option>
-                        <option>Ninguno</option>
-                        <option>Otro</option>
-                    </select>
-                </div>
-
-                <div class="col-md-4">
-                    <label for="compresor" class="form-label">Compresor</label>
-                    <select class="form-select" id="compresor" name="compresor" required>
-                        <option value="">Seleccione...</option>
-                        <option>WinRAR</option>
-                        <option>7-Zip</option>
-                        <option>WinZip</option>
-                        <option>PeaZip</option>
-                        <option>Ninguno</option>
-                    </select>
-                </div>
-
-                <div class="col-md-4">
-                    <label for="control_remoto" class="form-label">Control remoto</label>
-                    <select class="form-select" id="control_remoto" name="control_remoto" required>
-                        <option value="">Seleccione...</option>
-                        <option>AnyDesk</option>
-                        <option>TeamViewer</option>
-                        <option>Chrome Remote Desktop</option>
-                        <option>Ninguno</option>
-                    </select>
-                </div>
-
-                <div class="col-12">
-                    <label for="observaciones" class="form-label">Observaciones</label>
-                    <textarea class="form-control" id="observaciones" name="observaciones" rows="2"></textarea>
-                </div>
-
-                <div class="col-12 text-center">
-                    <button type="submit" class="btn btn-success px-4">Guardar Registro</button>
-                </div>
-            </form>
+        <div class="col-md-3">
+            <label class="form-label">Sede</label>
+            <select class="form-select" name="sede">
+                {% for s in sedes[1:] %}
+                <option value="{{ s }}">{{ s }}</option>
+                {% endfor %}
+            </select>
         </div>
-    </div>
+        <div class="col-md-3">
+            <label class="form-label">Área</label>
+            <input type="text" class="form-control" name="area">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Técnico</label>
+            <input type="text" class="form-control" name="tecnico" value="{{ nombre }}" readonly>
+        </div>
 
-    <div class="card shadow-lg mt-5">
-        <div class="card-header bg-secondary text-white">
-            <h5 class="mb-0">Registros de mantenimiento</h5>
+        <div class="col-md-3">
+            <label class="form-label">Nombre Máquina</label>
+            <input type="text" class="form-control" name="nombre_maquina">
         </div>
-        <div class="card-body">
-            {% if registros %}
-            <div class="table-responsive">
-                <table class="table table-striped align-middle text-center">
-                    <thead class="table-primary">
-                        <tr>
-                            <th>ID</th>
-                            <th>Fecha</th>
-                            <th>Sede</th>
-                            <th>Técnico</th>
-                            <th>Equipo</th>
-                            <th>SO</th>
-                            <th>Office</th>
-                            <th>Antivirus</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in registros %}
-                        <tr>
-                            <td>{{ row[0] }}</td>
-                            <td>{{ row[2] }}</td>
-                            <td>{{ row[1] }}</td>
-                            <td>{{ row[3] }}</td>
-                            <td>{{ row[4] }}</td>
-                            <td>{{ row[5] }}</td>
-                            <td>{{ row[6] }}</td>
-                            <td>{{ row[7] }}</td>
-                            <td>
-                                <a href="{{ url_for('editar', id=row[0]) }}" class="btn btn-warning btn-sm">Editar</a>
-                                <a href="{{ url_for('eliminar', id=row[0]) }}" class="btn btn-danger btn-sm" onclick="return confirm('¿Seguro de eliminar este registro?');">Eliminar</a>
-                                <a href="{{ url_for('descargar_acta', id=row[0]) }}" class="btn btn-outline-primary btn-sm">Descargar Acta</a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <div class="alert alert-info text-center">No hay registros aún.</div>
-            {% endif %}
+        <div class="col-md-3">
+            <label class="form-label">Usuario</label>
+            <input type="text" class="form-control" name="usuario_equipo">
         </div>
-    </div>
+        <div class="col-md-3">
+            <label class="form-label">Tipo de Equipo</label>
+            <select class="form-select" name="tipo_equipo">
+                <option value="Seleccione..">Seleccione..</option>
+                <option value="Portátil">Portátil</option>
+                <option value="All In One">All in One</option>
+                <option value="Impresora">Impresora</option>
+                <option value="Computador de Escritorio">Computador de Escritorio</option>
+                <option value="Servidor">Servidor</option>
+                <option value="Otro">Otro</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Marca</label>
+            <input type="text" class="form-control" name="marca">
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Modelo</label>
+            <input type="text" class="form-control" name="modelo">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Serial</label>
+            <input type="text" class="form-control" name="serial">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Sistema Operativo</label>
+            <select class="form-select" name="so">
+                <option value="Seleccione..">Seleccione..</option>
+                <option value="Windows 10 Pro 22H2">Windows 10 Pro 22H2</option>
+                <option value="Windows 11 Pro 23H2">Windows 11 Pro 23H2</option>
+                <option value="Windows 11 Pro 24H2">Windows 11 Pro 24H2</option>
+                <option value="MacOS">MacOS</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Office</label>
+            <select class="form-select" name="office">
+                <option value="Seleccione..">Seleccione..</option>
+                <option value="Microsoft Office 2013">Microsoft Office 2013</option>
+                <option value="Microsoft Office 365">Microsoft Office 365</option>
+                <option value="Microsoft Office 2016">Microsoft Office 2016</option>
+                <option value="Microsoft Office 2019">Microsoft Office 2019</option>
+                <option value="Microsoft Office 2021">Microsoft Office 2021</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Antivirus</label>
+            <select class="form-select" name="antivirus">
+                <option value="Seleccione..">Seleccione..</option>
+                <option value="Kaspesky Endpoint">Kaspesky Endpoint</option>
+                <option value="Windows Defender">Windows Defender</option>
+                <option value="Avast">Avast</option>
+                <option value="Otro">Otro</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Compresor</label>
+            <select class="form-select" name="compresor">
+                <option value="Seleccione..">Seleccione..</option>
+                <option value="WinRaR">WinRaR</option>
+                <option value="7-Zip">7-Zip</option>
+                <option value="PeaZip">PeaZip</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Control Remoto</label>
+            <select class="form-select" name="control_remoto">
+                <option value="Seleccione..">Seleccione..</option>
+                <option value="AnyDesk">AnyDesk</option>
+                <option value="TeamViewer">TeamViewer</option>
+                <option value="RuskDesk">RuskDesk</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Activo Fijo</label>
+            <input type="text" class="form-control" name="activo_fijo">
+        </div>
+        <div class="col-md-12">
+            <label class="form-label">Observaciones</label>
+            <textarea class="form-control" name="observaciones"></textarea>
+        </div>
+
+        <div class="col-12">
+            <button type="submit" class="btn btn-primary">Guardar Registro</button>
+        </div>
+    </form>
+
+    <h2>Registros</h2>
+    <form method="GET" class="row g-3 mb-3">
+        <div class="col-md-4">
+            <input type="text" class="form-control" name="q" placeholder="Buscar..." value="{{ search }}">
+        </div>
+        <div class="col-md-4">
+            <select class="form-select" name="sede">
+                {% for s in sedes %}
+                <option value="{{ s }}" {% if sede_filter == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <button type="submit" class="btn btn-secondary">Filtrar</button>
+        </div>
+    </form>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Fecha</th>
+                <th>Sede</th>
+                <th>Área</th>
+                <th>Técnico</th>
+                <th>Máquina</th>
+                <th>Usuario</th>
+                <th>Tipo</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in registros %}
+            <tr>
+                <td>{{ r.id }}</td>
+                <td>{{ r.fecha }}</td>
+                <td>{{ r.sede }}</td>
+                <td>{{ r.area }}</td>
+                <td>{{ r.tecnico }}</td>
+                <td>{{ r.nombre_maquina }}</td>
+                <td>{{ r.usuario }}</td>
+                <td>{{ r.tipo_equipo }}</td>
+                <td>
+                    <a href="{{ url_for('acta', rid=r.id) }}" class="btn btn-sm btn-success">Acta PDF</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
 </div>
-
-<footer class="text-center mt-5 mb-3 text-muted">
-    <small>&copy; {{ 2025 }} Sistema de Mantenimiento - Desarrollado por José Buelvas</small>
-</footer>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
