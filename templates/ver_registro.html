@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle del Registro{% endblock %}
+
+{% block content %}
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="text-primary"><i class="bi bi-clipboard-data"></i> Detalle del Mantenimiento</h3>
+        <a href="{{ url_for('principal') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Volver
+        </a>
+    </div>
+
+    <div class="card shadow-lg border-0 rounded-4 overflow-hidden">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-pc-display"></i> {{ registro['nombre_maquina'] }}</h5>
+        </div>
+
+        <div class="card-body bg-light">
+            <div class="row g-4">
+
+                <!-- Información general -->
+                <div class="col-md-6">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom fw-bold text-primary">
+                            Información general
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Sede:</strong> {{ registro['sede'] }}</p>
+                            <p><strong>Fecha:</strong> {{ registro['fecha'] }}</p>
+                            <p><strong>Área:</strong> {{ registro['area'] }}</p>
+                            <p><strong>Técnico:</strong> {{ registro['tecnico'] }}</p>
+                            <p><strong>Usuario del equipo:</strong> {{ registro['usuario'] }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detalles del equipo -->
+                <div class="col-md-6">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom fw-bold text-primary">
+                            Detalles del equipo
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Tipo de equipo:</strong> {{ registro['tipo_equipo'] }}</p>
+                            <p><strong>Marca:</strong> {{ registro['marca'] }}</p>
+                            <p><strong>Modelo:</strong> {{ registro['modelo'] }}</p>
+                            <p><strong>Serial:</strong> {{ registro['serial'] }}</p>
+                            <p><strong>Activo fijo:</strong> {{ registro['activo_fijo'] }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Software -->
+                <div class="col-md-6">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom fw-bold text-primary">
+                            Software instalado
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Sistema operativo:</strong> {{ registro['sistema_operativo'] }}</p>
+                            <p><strong>Office:</strong> {{ registro['office'] }}</p>
+                            <p><strong>Antivirus:</strong> {{ registro['antivirus'] }}</p>
+                            <p><strong>Compresor:</strong> {{ registro['compresor'] }}</p>
+                            <p><strong>Control remoto:</strong> {{ registro['control_remoto'] }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Observaciones -->
+                <div class="col-md-6">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom fw-bold text-primary">
+                            Observaciones
+                        </div>
+                        <div class="card-body">
+                            <p>{{ registro['observaciones'] or 'Sin observaciones.' }}</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
