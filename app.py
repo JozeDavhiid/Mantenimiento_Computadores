@@ -2,9 +2,9 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import openpyxl
 from io import BytesIO
 from datetime import date
+import openpyxl
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
@@ -110,6 +110,7 @@ def registro():
             flash('Técnico registrado correctamente', 'success')
             return redirect(url_for('login'))
         except psycopg2.IntegrityError:
+            conn.rollback()
             flash('El usuario ya existe', 'warning')
         finally:
             conn.close()
@@ -156,36 +157,6 @@ def principal():
         conn.commit()
         flash('Registro guardado', 'success')
 
-    # Actualizar registro
-    if request.method == 'POST' and request.form.get('action') == 'actualizar':
-        rid = request.form.get('id')
-        datos = (
-            request.form.get('sede',''),
-            request.form.get('fecha', date.today().isoformat()),
-            request.form.get('area',''),
-            request.form.get('tecnico',''),
-            request.form.get('nombre_maquina',''),
-            request.form.get('usuario_equipo',''),
-            request.form.get('tipo_equipo',''),
-            request.form.get('marca',''),
-            request.form.get('modelo',''),
-            request.form.get('serial',''),
-            request.form.get('so',''),
-            request.form.get('office',''),
-            request.form.get('antivirus',''),
-            request.form.get('compresor',''),
-            request.form.get('control_remoto',''),
-            request.form.get('activo_fijo',''),
-            request.form.get('observaciones',''),
-            rid
-        )
-        c.execute('''UPDATE mantenimiento SET
-                    sede=%s, fecha=%s, area=%s, tecnico=%s, nombre_maquina=%s, usuario=%s,
-                    tipo_equipo=%s, marca=%s, modelo=%s, serial=%s, sistema_operativo=%s, office=%s, antivirus=%s,
-                    compresor=%s, control_remoto=%s, activo_fijo=%s, observaciones=%s WHERE id=%s''', datos)
-        conn.commit()
-        flash('Registro actualizado', 'success')
-
     # Búsqueda y filtros
     search = request.args.get('q','').strip()
     sede_filter = request.args.get('sede','Todas')
@@ -209,8 +180,9 @@ def principal():
              "Monteria","Sincelejo","Valledupar","El Carmen de Bolivar","Magangue"]
 
     conn.close()
-    return render_template('principal.html', registros=registros, sedes=sedes, search=search,
-                           sede_filter=sede_filter, nombre=session.get('nombre'))
+    return render_template('principal.html', registros=registros, sedes=sedes,
+                           search=search, sede_filter=sede_filter, nombre=session.get('nombre'),
+                           hoy=date.today().isoformat())
 
 @app.route('/eliminar/<int:rid>', methods=['POST'])
 def eliminar(rid):
