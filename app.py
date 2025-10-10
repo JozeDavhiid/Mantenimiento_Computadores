@@ -85,6 +85,18 @@ def home():
         return redirect(url_for('principal'))
     return redirect(url_for('login'))
 
+@app.route('/consultar')
+def consultar():
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM mantenimiento ORDER BY id DESC")
+    registros = c.fetchall()
+    conn.close()
+
+    return render_template('consultar.html', registros=registros)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
