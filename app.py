@@ -201,10 +201,11 @@ def eliminar(rid):
     flash('Registro eliminado', 'info')
     return redirect(url_for('principal'))
 
-@app.route('/exportar')
-def exportar():
+@app.route('/consultar/exportar')
+def exportar_consulta():
     if 'usuario' not in session:
         return redirect(url_for('login'))
+    
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT * FROM mantenimiento")
@@ -213,7 +214,7 @@ def exportar():
 
     if not registros:
         flash('No hay registros para exportar', 'warning')
-        return redirect(url_for('principal'))
+        return redirect(url_for('consultar'))
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -226,7 +227,7 @@ def exportar():
     wb.save(bio)
     bio.seek(0)
 
-    return send_file(bio, as_attachment=True, download_name='Mantenimiento.xlsx',
+    return send_file(bio, as_attachment=True, download_name='Mantenimiento_Consulta.xlsx',
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 @app.route('/acta/<int:rid>')
