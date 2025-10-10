@@ -32,6 +32,7 @@
             <button type="submit" class="btn btn-primary">Filtrar</button>
             <a href="{{ url_for('consultar') }}" class="btn btn-secondary">Limpiar</a>
             <a href="{{ url_for('exportar_consulta') }}" class="btn btn-success">Exportar Todos a Excel</a>
+            <a href="{{ url_for('editar_registro', id=registro[0]) }}" class="btn btn-warning btn-sm">Editar</a>
         </div>
     </form>
 
@@ -80,6 +81,9 @@
                 <td>{{ r.control_remoto }}</td>
                 <td>{{ r.activo_fijo }}</td>
                 <td>{{ r.observaciones }}</td>
+                <td>
+                    <a href="{{ url_for('editar_registro', id=registro[0]) }}" class="btn btn-warning btn-sm">Editar</a>
+                </td>
                 <td>
                     <a href="{{ url_for('generar_acta', rid=r.id) }}" class="btn btn-success btn-sm">Acta</a>
                 </td>

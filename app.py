@@ -2,11 +2,16 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import openpyxl
 from io import BytesIO
 from datetime import date
+import openpyxl
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from io import BytesIO
+import textwrap
 
 # -----------------------
 # Configuración
@@ -20,14 +25,12 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'cambiala_por_una_secreta_en_render')
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
-
 # -----------------------
 # Funciones DB
 # -----------------------
 def get_db():
     conn = psycopg2.connect(DB_URL, cursor_factory=RealDictCursor)
     return conn
-
 
 def init_db():
     conn = get_db()
@@ -68,10 +71,8 @@ def init_db():
     conn.commit()
     conn.close()
 
-
 with app.app_context():
     init_db()
-
 
 # -----------------------
 # Rutas
@@ -81,7 +82,6 @@ def home():
     if 'usuario' in session:
         return redirect(url_for('principal'))
     return redirect(url_for('login'))
-
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -100,7 +100,6 @@ def login():
         flash('Usuario o contraseña incorrectos', 'danger')
     return render_template('login.html')
 
-
 @app.route('/registro', methods=['GET', 'POST'])
 def registro():
     if request.method == 'POST':
@@ -116,17 +115,16 @@ def registro():
             flash('Técnico registrado correctamente', 'success')
             return redirect(url_for('login'))
         except psycopg2.IntegrityError:
+            conn.rollback()
             flash('El usuario ya existe', 'warning')
         finally:
             conn.close()
     return render_template('registro.html')
 
-
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
-
 
 @app.route('/principal', methods=['GET', 'POST'])
 def principal():
@@ -139,23 +137,23 @@ def principal():
     # Insertar registro
     if request.method == 'POST' and request.form.get('action') == 'guardar':
         datos = (
-            request.form.get('sede', ''),
+            request.form.get('sede',''),
             request.form.get('fecha', date.today().isoformat()),
-            request.form.get('area', ''),
-            session.get('nombre', ''),
-            request.form.get('nombre_maquina', '').upper(),  # Mayúsculas
-            request.form.get('usuario_equipo', ''),
-            request.form.get('tipo_equipo', ''),
-            request.form.get('marca', '').upper(),           # Mayúsculas
-            request.form.get('modelo', '').upper(),          # Mayúsculas
-            request.form.get('serial', '').upper(),          # Mayúsculas
-            request.form.get('so', ''),
-            request.form.get('office', ''),
-            request.form.get('antivirus', ''),
-            request.form.get('compresor', ''),
-            request.form.get('control_remoto', ''),
-            request.form.get('activo_fijo', ''),
-            request.form.get('observaciones', '')
+            request.form.get('area',''),
+            session.get('nombre',''),
+            request.form.get('nombre_maquina',''),
+            request.form.get('usuario_equipo',''),
+            request.form.get('tipo_equipo',''),
+            request.form.get('marca',''),
+            request.form.get('modelo',''),
+            request.form.get('serial',''),
+            request.form.get('so',''),
+            request.form.get('office',''),
+            request.form.get('antivirus',''),
+            request.form.get('compresor',''),
+            request.form.get('control_remoto',''),
+            request.form.get('activo_fijo',''),
+            request.form.get('observaciones','')
         )
         c.execute('''INSERT INTO mantenimiento
                     (sede, fecha, area, tecnico, nombre_maquina, usuario, tipo_equipo, marca, modelo, serial,
@@ -164,36 +162,99 @@ def principal():
         conn.commit()
         flash('Registro guardado', 'success')
 
-    # Cargar registros
-    c.execute("SELECT * FROM mantenimiento ORDER BY id DESC")
+    # Búsqueda y filtros
+    search = request.args.get('q','').strip()
+    sede_filter = request.args.get('sede','Todas')
+    query = "SELECT * FROM mantenimiento WHERE 1=1"
+    params = []
+    if search:
+        like = f"%{search}%"
+        query += """ AND (sede ILIKE %s OR area ILIKE %s OR tecnico ILIKE %s OR nombre_maquina ILIKE %s 
+                     OR usuario ILIKE %s OR tipo_equipo ILIKE %s OR marca ILIKE %s OR modelo ILIKE %s 
+                     OR serial ILIKE %s OR sistema_operativo ILIKE %s OR office ILIKE %s OR antivirus ILIKE %s 
+                     OR compresor ILIKE %s OR control_remoto ILIKE %s OR activo_fijo ILIKE %s OR observaciones ILIKE %s)"""
+        params += [like]*16
+    if sede_filter and sede_filter != 'Todas':
+        query += " AND sede = %s"
+        params.append(sede_filter)
+    query += " ORDER BY id DESC"
+    c.execute(query, params)
     registros = c.fetchall()
 
-    sedes = ["Todas", "Nivel Central", "Barranquilla", "Soledad", "Santa Marta", "El Banco",
-             "Monteria", "Sincelejo", "Valledupar", "El Carmen de Bolivar", "Magangue"]
+    sedes = ["Todas","Nivel Central","Barranquilla","Soledad","Santa Marta","El Banco",
+             "Monteria","Sincelejo","Valledupar","El Carmen de Bolivar","Magangue"]
 
     conn.close()
-    return render_template('principal.html', registros=registros, sedes=sedes, nombre=session.get('nombre'), hoy=date.today())
+    return render_template('principal.html', registros=registros, sedes=sedes,
+                           search=search, sede_filter=sede_filter, nombre=session.get('nombre'),
+                           hoy=date.today().isoformat())
 
+@app.route('/editar/<int:id>', methods=['GET', 'POST'])
+def editar_registro(id):
+    if 'nombre' not in session:
+        return redirect(url_for('login'))
 
-@app.route('/consultar')
-def consultar():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    if request.method == 'POST':
+        fecha = request.form['fecha']
+        nombre_maquina = request.form['nombre_maquina']
+        marca = request.form['marca']
+        modelo = request.form['modelo']
+        serial = request.form['serial']
+        sede_id = request.form['sede']
+        observaciones = request.form['observaciones']
+
+        cur.execute("""
+            UPDATE registros
+            SET fecha = %s, nombre_maquina = %s, marca = %s, modelo = %s,
+                serial = %s, sede_id = %s, observaciones = %s
+            WHERE id = %s
+        """, (fecha, nombre_maquina, marca, modelo, serial, sede_id, observaciones, id))
+        conn.commit()
+
+        cur.close()
+        conn.close()
+
+        flash("Registro actualizado correctamente", "success")
+        return redirect(url_for('consultar'))
+
+    # Método GET: obtener datos actuales del registro
+    cur.execute("""
+        SELECT id, fecha, nombre_maquina, marca, modelo, serial, sede_id, observaciones
+        FROM registros WHERE id = %s
+    """, (id,))
+    registro = cur.fetchone()
+
+    cur.execute("SELECT id, nombre FROM sedes ORDER BY nombre")
+    sedes = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template('editar.html', registro=registro, sedes=sedes)
+
+@app.route('/eliminar/<int:rid>', methods=['POST'])
+def eliminar(rid):
     if 'usuario' not in session:
         return redirect(url_for('login'))
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT * FROM mantenimiento ORDER BY id DESC")
-    registros = c.fetchall()
+    c.execute("DELETE FROM mantenimiento WHERE id=%s", (rid,))
+    conn.commit()
     conn.close()
-    return render_template('consultar.html', registros=registros)
+    flash('Registro eliminado', 'info')
+    return redirect(url_for('principal'))
 
-
-@app.route('/exportar')
-def exportar():
+@app.route('/consultar/exportar')
+def exportar_consulta():
     if 'usuario' not in session:
         return redirect(url_for('login'))
+    
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT * FROM mantenimiento ORDER BY id DESC")
+    c.execute("SELECT * FROM mantenimiento")
     registros = c.fetchall()
     conn.close()
 
@@ -206,15 +267,14 @@ def exportar():
     ws.title = "Mantenimiento"
     encabezados = list(registros[0].keys())
     ws.append(encabezados)
-    for r in registros:
-        ws.append(list(r.values()))
-
+    for row in registros:
+        ws.append(list(row.values()))
     bio = BytesIO()
     wb.save(bio)
     bio.seek(0)
-    return send_file(bio, as_attachment=True, download_name="Mantenimiento.xlsx",
-                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
+    return send_file(bio, as_attachment=True, download_name='Mantenimiento_Consulta.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 @app.route('/acta/<int:rid>')
 def generar_acta(rid):
@@ -232,41 +292,109 @@ def generar_acta(rid):
         return redirect(url_for('principal'))
 
     buffer = BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=letter)
+    c_pdf = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
-    pdf.setFont("Helvetica", 12)
 
+    # Margenes y posiciones
+    x_margin = 50
     y = height - 50
-    pdf.drawString(50, y, f"Acta de Mantenimiento - Registro ID: {registro['id']}")
-    y -= 25
-    for key, value in registro.items():
-        pdf.drawString(50, y, f"{key.replace('_', ' ').title()}: {value}")
-        y -= 20
-        if y < 50:
-            pdf.showPage()
-            pdf.setFont("Helvetica", 12)
-            y = height - 50
+    line_height = 18
+    box_padding = 5
+    c_pdf.setFont("Helvetica-Bold", 16)
 
-    pdf.save()
+    # Título
+    c_pdf.drawCentredString(width/2, y, f"Acta de Mantenimiento - Registro ID: {registro['id']}")
+    y -= 40
+    c_pdf.setFont("Helvetica-Bold", 12)
+
+    # Campos a mostrar
+    campos = [
+        ('Sede', registro['sede']),
+        ('Fecha', registro['fecha']),
+        ('Área', registro['area']),
+        ('Técnico', registro['tecnico']),
+        ('Nombre Máquina', registro['nombre_maquina']),
+        ('Usuario', registro['usuario']),
+        ('Tipo Equipo', registro['tipo_equipo']),
+        ('Marca', registro['marca']),
+        ('Modelo', registro['modelo']),
+        ('Serial', registro['serial']),
+        ('Sistema Operativo', registro['sistema_operativo']),
+        ('Office', registro['office']),
+        ('Antivirus', registro['antivirus']),
+        ('Compresor', registro['compresor']),
+        ('Control Remoto', registro['control_remoto']),
+        ('Activo Fijo', registro['activo_fijo']),
+        ('Observaciones', registro['observaciones'])
+    ]
+
+    # Dibujar cada campo en un cuadro
+    for titulo, valor in campos:
+        if y < 80:  # Nueva página si se acaba el espacio
+            c_pdf.showPage()
+            y = height - 50
+            c_pdf.setFont("Helvetica-Bold", 12)
+
+        # Título del campo
+        c_pdf.setFont("Helvetica-Bold", 12)
+        c_pdf.drawString(x_margin, y, titulo + ":")
+        y -= line_height
+
+        # Valor del campo, ajustando líneas largas
+        c_pdf.setFont("Helvetica", 12)
+        for line in textwrap.wrap(str(valor), width=90):
+            c_pdf.drawString(x_margin + 15, y, line)
+            y -= line_height
+
+        # Línea separadora
+        c_pdf.setStrokeColor(colors.grey)
+        c_pdf.line(x_margin, y + box_padding, width - x_margin, y + box_padding)
+        y -= 10
+
+    c_pdf.showPage()
+    c_pdf.save()
     buffer.seek(0)
 
-    return send_file(buffer, as_attachment=True,
-                     download_name=f"Acta_Registro_{registro['id']}.pdf",
-                     mimetype='application/pdf')
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"Acta_Registro_{registro['id']}.pdf",
+        mimetype='application/pdf'
+    )
 
-
-@app.route('/eliminar/<int:rid>', methods=['POST'])
-def eliminar(rid):
+@app.route('/consultar')
+def consultar():
     if 'usuario' not in session:
         return redirect(url_for('login'))
+
     conn = get_db()
     c = conn.cursor()
-    c.execute("DELETE FROM mantenimiento WHERE id=%s", (rid,))
-    conn.commit()
-    conn.close()
-    flash('Registro eliminado', 'info')
-    return redirect(url_for('principal'))
 
+    # Búsqueda y filtro (igual que principal)
+    search = request.args.get('q','').strip()
+    sede_filter = request.args.get('sede','Todas')
+    query = "SELECT * FROM mantenimiento WHERE 1=1"
+    params = []
+    if search:
+        like = f"%{search}%"
+        query += """ AND (sede ILIKE %s OR area ILIKE %s OR tecnico ILIKE %s OR nombre_maquina ILIKE %s 
+                     OR usuario ILIKE %s OR tipo_equipo ILIKE %s OR marca ILIKE %s OR modelo ILIKE %s 
+                     OR serial ILIKE %s OR sistema_operativo ILIKE %s OR office ILIKE %s OR antivirus ILIKE %s 
+                     OR compresor ILIKE %s OR control_remoto ILIKE %s OR activo_fijo ILIKE %s OR observaciones ILIKE %s)"""
+        params += [like]*16
+    if sede_filter and sede_filter != 'Todas':
+        query += " AND sede = %s"
+        params.append(sede_filter)
+    query += " ORDER BY id DESC"
+    c.execute(query, params)
+    registros = c.fetchall()
+    conn.close()
+
+    sedes = ["Todas","Nivel Central","Barranquilla","Soledad","Santa Marta","El Banco",
+             "Monteria","Sincelejo","Valledupar","El Carmen de Bolivar","Magangue"]
+
+    return render_template('consultar.html', registros=registros, sedes=sedes,
+                           search=search, sede_filter=sede_filter, nombre=session.get('nombre'))
 
 # -----------------------
 # Main
