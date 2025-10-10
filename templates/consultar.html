@@ -50,7 +50,7 @@
                         <td>{{ r.observaciones }}</td>
                         <td class="text-center">
                             <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-info btn-sm">Ver</a>
-                            <a href="{{ url_for('generar_acta', rid=r.id) }}" class="btn btn-secondary btn-sm">Acta</a>
+                            <a href="{{ url_for('acta_pdf', rid=r.id) }}" class="btn btn-secondary btn-sm">Acta</a>
                             <form action="{{ url_for('eliminar', rid=r.id) }}" method="post" style="display:inline;">
                                 <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('¿Eliminar este registro?')">Eliminar</button>
                             </form>
