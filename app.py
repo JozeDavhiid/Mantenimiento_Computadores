@@ -292,7 +292,7 @@ def exportar():
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 @app.route('/acta/<int:rid>')
-def generar_acta(rid):
+def acta_pdf(rid):
     if 'usuario' not in session:
         return redirect(url_for('login'))
 
@@ -303,34 +303,59 @@ def generar_acta(rid):
     conn.close()
 
     if not registro:
-        flash('Registro no encontrado', 'warning')
+        flash("Registro no encontrado", "warning")
         return redirect(url_for('principal'))
 
-    buffer = BytesIO()
-    c_pdf = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
-    c_pdf.setFont("Helvetica", 12)
+    # Evita errores por valores None
+    def safe(value):
+        return str(value or '').replace('\n', ' ').strip()
 
-    y = height - 50
-    c_pdf.drawString(50, y, f"Acta de Mantenimiento - Registro ID: {registro['id']}")
-    y -= 25
-    for key, value in registro.items():
-        texto = f"{key.replace('_',' ').title()}: {value}"
-        c_pdf.drawString(50, y, texto[:110])
-        y -= 20
-        if y < 50:
-            c_pdf.showPage()
-            c_pdf.setFont("Helvetica", 12)
-            y = height - 50
+    # Importamos librerías PDF
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
 
-    c_pdf.showPage()
-    c_pdf.save()
-    buffer.seek(0)
+    # Creamos PDF temporal
+    pdf_path = f"/tmp/acta_{rid}.pdf"
+    doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+    styles = getSampleStyleSheet()
+    content = []
 
-    return send_file(buffer, as_attachment=True,
-                     download_name=f"Acta_Registro_{registro['id']}.pdf",
-                     mimetype='application/pdf')
+    content.append(Paragraph("<b>ACTA DE MANTENIMIENTO</b>", styles['Title']))
+    content.append(Spacer(1, 12))
 
+    campos = [
+        ('Sede', registro.sede),
+        ('Fecha', registro.fecha),
+        ('Área', registro.area),
+        ('Técnico', registro.tecnico),
+        ('Nombre Máquina', registro.nombre_maquina),
+        ('Usuario Equipo', registro.usuario),
+        ('Tipo Equipo', registro.tipo_equipo),
+        ('Marca', registro.marca),
+        ('Modelo', registro.modelo),
+        ('Serial', registro.serial),
+        ('Sistema Operativo', registro.sistema_operativo),
+        ('Office', registro.office),
+        ('Antivirus', registro.antivirus),
+        ('Compresor', registro.compresor),
+        ('Control Remoto', registro.control_remoto),
+        ('Activo Fijo', registro.activo_fijo),
+    ]
+
+    for etiqueta, valor in campos:
+        content.append(Paragraph(f"<b>{etiqueta}:</b> {safe(valor)}", styles['Normal']))
+        content.append(Spacer(1, 6))
+
+    content.append(Spacer(1, 12))
+    content.append(Paragraph("<b>Observaciones:</b>", styles['Heading3']))
+    content.append(Paragraph(safe(registro.observaciones), styles['Normal']))
+
+    # Generar el PDF
+    doc.build(content)
+
+    return send_file(pdf_path, as_attachment=True, download_name=f"Acta_{registro.id}.pdf")
+    
 @app.route('/consultar')
 def consultar():
     if 'usuario' not in session:
