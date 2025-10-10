@@ -150,8 +150,9 @@
 
         <div class="col-12">
             <button type="submit" class="btn btn-primary mt-2">Guardar Registro</button>
-            <button href="{{ url_for('consultar') }}" target="_blank" class="btn btn-info">Consultar Registros</button>
-
+        </div>
+        <div class="col-12">
+            <a href="{{ url_for('consultar') }}" target="_blank" class="btn btn-info">Consultar Registros</a>
         </div>
     </form>
 
@@ -181,7 +182,7 @@
                 <td>{{ r.fecha }}</td>
                 <td>{{ r.tecnico }}</td>
                 <td>{{ r.nombre_maquina }}</td>
-                <th>{{ r.usuario_equipo }}</th>
+                <th>{{ r.usuario }}</th>
                 <th>{{ r.marca }}</th>
                 <th>{{ r.modelo }}</th>
                 <th>{{ r.serial }}</th>
