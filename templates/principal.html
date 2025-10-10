@@ -150,9 +150,8 @@
 
         <div class="col-12">
             <button type="submit" class="btn btn-primary mt-2">Guardar Registro</button>
-        </div>
-        <div class="mb-3">
-            <a href="{{ url_for('consultar') }}" target="_blank" class="btn btn-info">Consultar Todos los Registros</a>
+            <button href="{{ url_for('consultar') }}" target="_blank" class="btn btn-info">Consultar Registros</button>
+
         </div>
     </form>
 
@@ -167,6 +166,10 @@
                 <th>Fecha</th>
                 <th>Técnico</th>
                 <th>Nombre Máquina</th>
+                <th>Usuario</th>
+                <th>Marca</th>
+                <th>Modelo</th>
+                <th>Serial</th>
                 <th>Acciones</th>
             </tr>
         </thead>
@@ -178,6 +181,10 @@
                 <td>{{ r.fecha }}</td>
                 <td>{{ r.tecnico }}</td>
                 <td>{{ r.nombre_maquina }}</td>
+                <th>{{ r.usuario_equipo }}</th>
+                <th>{{ r.marca }}</th>
+                <th>{{ r.modelo }}</th>
+                <th>{{ r.serial }}</th>
                 <td>
                     <form action="{{ url_for('eliminar', rid=r.id) }}" method="POST" style="display:inline;">
                         <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
