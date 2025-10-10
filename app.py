@@ -207,10 +207,44 @@ def actualizar_registro(rid):
     conn = get_db()
     c = conn.cursor()
     c.execute('''UPDATE mantenimiento SET
-                 sede=%s, area=%s, nombre_maquina=%s, usuario=%s, observaciones=%s
+                 sede=%s,
+                 fecha=%s,
+                 area=%s,
+                 tecnico=%s,
+                 nombre_maquina=%s,
+                 usuario=%s,
+                 tipo_equipo=%s,
+                 marca=%s,
+                 modelo=%s,
+                 serial=%s,
+                 sistema_operativo=%s,
+                 office=%s,
+                 antivirus=%s,
+                 compresor=%s,
+                 control_remoto=%s,
+                 activo_fijo=%s,
+                 observaciones=%s
                  WHERE id=%s''',
-              (request.form['sede'], request.form['area'], request.form['nombre_maquina'].upper(),
-               request.form['usuario_equipo'], request.form['observaciones'], rid))
+              (
+                  request.form.get('sede'),
+                  request.form.get('fecha'),
+                  request.form.get('area'),
+                  request.form.get('tecnico'),
+                  request.form.get('nombre_maquina', '').upper(),
+                  request.form.get('usuario_equipo'),
+                  request.form.get('tipo_equipo'),
+                  request.form.get('marca', '').upper(),
+                  request.form.get('modelo', '').upper(),
+                  request.form.get('serial', '').upper(),
+                  request.form.get('so'),
+                  request.form.get('office'),
+                  request.form.get('antivirus'),
+                  request.form.get('compresor'),
+                  request.form.get('control_remoto'),
+                  request.form.get('activo_fijo'),
+                  request.form.get('observaciones'),
+                  rid
+              ))
     conn.commit()
     conn.close()
 
