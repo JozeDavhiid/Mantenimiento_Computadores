@@ -20,15 +20,20 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'cambiala_por_una_secreta_en_render')
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
+
 # -----------------------
-# Funciones DB
+# Función conexión DB
 # -----------------------
-def get_db():
+def get_db_connection():
     conn = psycopg2.connect(DB_URL, cursor_factory=RealDictCursor)
     return conn
 
+
+# -----------------------
+# Inicializar DB
+# -----------------------
 def init_db():
-    conn = get_db()
+    conn = get_db_connection()
     c = conn.cursor()
     # Tabla mantenimiento
     c.execute('''CREATE TABLE IF NOT EXISTS mantenimiento (
@@ -58,7 +63,7 @@ def init_db():
                     nombre TEXT,
                     contrasena TEXT
                 )''')
-    # Insert default admin
+    # Usuario admin por defecto
     c.execute("SELECT * FROM tecnicos WHERE usuario='admin'")
     if not c.fetchone():
         c.execute("INSERT INTO tecnicos (usuario, nombre, contrasena) VALUES (%s, %s, %s)",
@@ -66,11 +71,13 @@ def init_db():
     conn.commit()
     conn.close()
 
+
 with app.app_context():
     init_db()
 
+
 # -----------------------
-# Rutas
+# Rutas principales
 # -----------------------
 @app.route('/')
 def home():
@@ -78,12 +85,13 @@ def home():
         return redirect(url_for('principal'))
     return redirect(url_for('login'))
 
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         usuario = request.form['usuario'].strip()
         contrasena = request.form['contrasena'].strip()
-        conn = get_db()
+        conn = get_db_connection()
         c = conn.cursor()
         c.execute("SELECT nombre FROM tecnicos WHERE usuario=%s AND contrasena=%s", (usuario, contrasena))
         row = c.fetchone()
@@ -95,13 +103,14 @@ def login():
         flash('Usuario o contraseña incorrectos', 'danger')
     return render_template('login.html')
 
+
 @app.route('/registro', methods=['GET', 'POST'])
 def registro():
     if request.method == 'POST':
         usuario = request.form['usuario'].strip()
         nombre = request.form['nombre'].strip()
         contrasena = request.form['contrasena'].strip()
-        conn = get_db()
+        conn = get_db_connection()
         c = conn.cursor()
         try:
             c.execute("INSERT INTO tecnicos (usuario, nombre, contrasena) VALUES (%s, %s, %s)",
@@ -115,17 +124,19 @@ def registro():
             conn.close()
     return render_template('registro.html')
 
+
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
 
 @app.route('/principal', methods=['GET', 'POST'])
 def principal():
     if 'usuario' not in session:
         return redirect(url_for('login'))
 
-    conn = get_db()
+    conn = get_db_connection()
     c = conn.cursor()
 
     # Insertar registro
@@ -182,12 +193,13 @@ def principal():
                            search=search, sede_filter=sede_filter, nombre=session.get('nombre'),
                            hoy=date.today().isoformat())
 
+
 @app.route('/obtener_registro/<int:rid>')
 def obtener_registro(rid):
     if 'usuario' not in session:
         return redirect(url_for('login'))
 
-    conn = get_db()
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM mantenimiento WHERE id=%s", (rid,))
     registro = c.fetchone()
@@ -199,63 +211,36 @@ def obtener_registro(rid):
 
     return render_template('editar.html', registro=registro)
 
+
 @app.route('/actualizar/<int:rid>', methods=['POST'])
 def actualizar_registro(rid):
     if 'usuario' not in session:
         return redirect(url_for('login'))
 
-    conn = get_db()
+    conn = get_db_connection()
     c = conn.cursor()
+    campos = [
+        'sede','fecha','area','nombre_maquina','usuario_equipo','tipo_equipo','marca',
+        'modelo','serial','so','office','antivirus','compresor','control_remoto','activo_fijo','observaciones'
+    ]
+    valores = [request.form.get(campo,'') for campo in campos]
     c.execute('''UPDATE mantenimiento SET
-                 sede=%s,
-                 fecha=%s,
-                 area=%s,
-                 tecnico=%s,
-                 nombre_maquina=%s,
-                 usuario=%s,
-                 tipo_equipo=%s,
-                 marca=%s,
-                 modelo=%s,
-                 serial=%s,
-                 sistema_operativo=%s,
-                 office=%s,
-                 antivirus=%s,
-                 compresor=%s,
-                 control_remoto=%s,
-                 activo_fijo=%s,
-                 observaciones=%s
-                 WHERE id=%s''',
-              (
-                  request.form.get('sede'),
-                  request.form.get('fecha'),
-                  request.form.get('area'),
-                  request.form.get('tecnico'),
-                  request.form.get('nombre_maquina', '').upper(),
-                  request.form.get('usuario_equipo'),
-                  request.form.get('tipo_equipo'),
-                  request.form.get('marca', '').upper(),
-                  request.form.get('modelo', '').upper(),
-                  request.form.get('serial', '').upper(),
-                  request.form.get('so'),
-                  request.form.get('office'),
-                  request.form.get('antivirus'),
-                  request.form.get('compresor'),
-                  request.form.get('control_remoto'),
-                  request.form.get('activo_fijo'),
-                  request.form.get('observaciones'),
-                  rid
-              ))
+                 sede=%s, fecha=%s, area=%s, nombre_maquina=%s, usuario=%s, tipo_equipo=%s, 
+                 marca=%s, modelo=%s, serial=%s, sistema_operativo=%s, office=%s, antivirus=%s,
+                 compresor=%s, control_remoto=%s, activo_fijo=%s, observaciones=%s
+                 WHERE id=%s''', (*valores, rid))
     conn.commit()
     conn.close()
 
     flash('Registro actualizado correctamente', 'success')
     return redirect(url_for('principal'))
 
+
 @app.route('/eliminar/<int:rid>', methods=['POST'])
 def eliminar(rid):
     if 'usuario' not in session:
         return redirect(url_for('login'))
-    conn = get_db()
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute("DELETE FROM mantenimiento WHERE id=%s", (rid,))
     conn.commit()
@@ -263,11 +248,12 @@ def eliminar(rid):
     flash('Registro eliminado', 'info')
     return redirect(url_for('principal'))
 
+
 @app.route('/exportar')
 def exportar():
     if 'usuario' not in session:
         return redirect(url_for('login'))
-    conn = get_db()
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM mantenimiento")
     registros = c.fetchall()
@@ -291,69 +277,47 @@ def exportar():
     return send_file(bio, as_attachment=True, download_name='Mantenimiento.xlsx',
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
+
 @app.route('/acta/<int:rid>')
 def acta_pdf(rid):
-    conn = get_db_connection()
-    registro = conn.execute('SELECT * FROM registros WHERE id = %s', (rid,)).fetchone()
-    conn.close()
-
-    if not registro:
-        return "Registro no encontrado", 404
-
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4)
-    elements = []
-
-    styles = getSampleStyleSheet()
-    elements.append(Paragraph("<b>ACTA DE MANTENIMIENTO</b>", styles["Title"]))
-    elements.append(Spacer(1, 12))
-
-    data = [
-        ['Campo', 'Valor'],
-        ('Sede', registro['sede']),
-        ('Fecha', str(registro['fecha'])),
-        ('Encargado', registro['encargado']),
-        ('Nombre', registro['nombre']),
-        ('Cargo', registro['cargo']),
-        ('Serial', registro['serial']),
-        ('Procesador', registro['procesador']),
-        ('Disco Duro', registro['disco_duro']),
-        ('RAM', registro['ram']),
-        ('Sistema Operativo', registro['sistema_operativo']),
-        ('Tareas Realizadas', registro['tareas']),
-        ('Estado', registro['estado']),
-        ('Observaciones', registro['observaciones']),
-    ]
-
-    table = Table(data, colWidths=[150, 350])
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-    ]))
-    elements.append(table)
-
-    doc.build(elements)
-    pdf = buffer.getvalue()
-    buffer.close()
-
-    return Response(pdf, mimetype='application/pdf',
-                    headers={'Content-Disposition': f'inline; filename=acta_{rid}.pdf'})
-
-@app.route('/consultar')
-def consultar():
     if 'usuario' not in session:
         return redirect(url_for('login'))
 
-    conn = get_db()
+    conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM mantenimiento ORDER BY id DESC")
-    registros = c.fetchall()
+    c.execute("SELECT * FROM mantenimiento WHERE id=%s", (rid,))
+    registro = c.fetchone()
     conn.close()
 
-    return render_template('consultar.html', registros=registros)
+    if not registro:
+        flash('Registro no encontrado', 'warning')
+        return redirect(url_for('principal'))
+
+    buffer = BytesIO()
+    c_pdf = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    c_pdf.setFont("Helvetica", 12)
+    y = height - 50
+    c_pdf.drawString(50, y, f"Acta de Mantenimiento - ID: {registro['id']}")
+    y -= 25
+
+    for k, v in registro.items():
+        texto = f"{k.replace('_',' ').title()}: {v}"
+        for linea in [texto[i:i+100] for i in range(0, len(texto), 100)]:
+            c_pdf.drawString(50, y, linea)
+            y -= 15
+            if y < 50:
+                c_pdf.showPage()
+                c_pdf.setFont("Helvetica", 12)
+                y = height - 50
+
+    c_pdf.save()
+    buffer.seek(0)
+
+    return send_file(buffer, as_attachment=True,
+                     download_name=f"Acta_Registro_{registro['id']}.pdf",
+                     mimetype='application/pdf')
+
 
 # -----------------------
 # Main
