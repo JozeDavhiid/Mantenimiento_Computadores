@@ -35,9 +35,15 @@
         <div class="col-md-3">
             <label>Sede</label>
             <select name="sede" class="form-select">
-                {% for s in sedes if s != 'Todas' %}
-                <option>{{ s }}</option>
-                {% endfor %}
+                <option>Nivel Central</option>
+                <option>Barranquilla</option>
+                <option>Soledad</option>
+                <option>Santa Marta</option>
+                <option>El Banco</option>
+                <option>Monteria</option>
+                <option>Sincelejo</option>
+                <option>El Carmen de Bolivar</option>
+                <option>Magangue</option>
             </select>
         </div>
 
@@ -53,7 +59,7 @@
 
         <div class="col-md-3">
             <label>Nombre Máquina</label>
-            <input type="text" name="nombre_maquina" class="form-control">
+            <input type="text" name="nombre_maquina" class="form-control" required>
         </div>
 
         <div class="col-md-3">
@@ -74,17 +80,17 @@
 
         <div class="col-md-3">
             <label>Marca</label>
-            <input type="text" name="marca" class="form-control">
+            <input type="text" name="marca" class="form-control" required>
         </div>
 
         <div class="col-md-3">
             <label>Modelo</label>
-            <input type="text" name="modelo" class="form-control">
+            <input type="text" name="modelo" class="form-control" required>
         </div>
 
         <div class="col-md-3">
             <label>Serial</label>
-            <input type="text" name="serial" class="form-control">
+            <input type="text" name="serial" class="form-control" required>
         </div>
 
         <div class="col-md-3">
@@ -101,10 +107,10 @@
             <label>Office</label>
             <select name="office" class="form-select">
                 <option>Microsoft Office 2013</option>
+                <option>Microsoft Office 365</option>
                 <option>Microsoft Office 2016</option>
                 <option>Microsoft Office 2019</option>
                 <option>Microsoft Office 2021</option>
-                <option>Microsoft Office 365</option>
                 <option>No Instalado</option>
             </select>
         </div>
@@ -112,7 +118,7 @@
         <div class="col-md-3">
             <label>Antivirus</label>
             <select name="antivirus" class="form-select">
-                <option>Kaspersky Endpoint</option>
+                <option>Kaspesky Endpoint</option>
                 <option>Windows Defender</option>
                 <option>Avast</option>
                 <option>No Instalado</option>
@@ -148,13 +154,12 @@
             <input type="text" name="observaciones" class="form-control">
         </div>
 
-        <div class="col-12 d-flex gap-2 mt-2">
+        <!-- Botones alineados -->
+        <div class="d-flex justify-content-start gap-2 mt-3">
             <button type="submit" class="btn btn-primary">Guardar Registro</button>
             <a href="{{ url_for('consultar') }}" target="_blank" class="btn btn-info">Consultar Registros</a>
         </div>
     </form>
-
-    
 
     <!-- TABLA DE REGISTROS -->
     <table class="table table-striped">
@@ -165,10 +170,6 @@
                 <th>Fecha</th>
                 <th>Técnico</th>
                 <th>Nombre Máquina</th>
-                <th>Usuario</th>
-                <th>Marca</th>
-                <th>Modelo</th>
-                <th>Serial</th>
                 <th>Acciones</th>
             </tr>
         </thead>
@@ -185,6 +186,7 @@
                 <th>{{ r.modelo }}</th>
                 <th>{{ r.serial }}</th>
                 <td>
+                    <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-info btn-sm">Ver</a>
                     <form action="{{ url_for('eliminar', rid=r.id) }}" method="POST" style="display:inline;">
                         <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
                     </form>
@@ -197,5 +199,21 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Script para forzar mayúsculas -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const campos = ['nombre_maquina', 'marca', 'modelo', 'serial'];
+    campos.forEach(function(nombre) {
+        const input = document.getElementsByName(nombre)[0];
+        if (input) {
+            input.addEventListener('input', function() {
+                this.value = this.value.toUpperCase();
+            });
+        }
+    });
+});
+</script>
+
 </body>
 </html>
