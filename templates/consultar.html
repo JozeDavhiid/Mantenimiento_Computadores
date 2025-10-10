@@ -16,12 +16,6 @@
     </div>
 </nav>
 
-<div class="mb-3">
-    <a href="{{ url_for('exportar_consulta') }}" class="btn btn-success">
-        Exportar Todos a Excel
-    </a>
-</div>
-
 <div class="container">
     <form method="GET" class="row g-3 mb-3">
         <div class="col-md-4">
@@ -37,6 +31,7 @@
         <div class="col-md-4">
             <button type="submit" class="btn btn-primary">Filtrar</button>
             <a href="{{ url_for('consultar') }}" class="btn btn-secondary">Limpiar</a>
+            <a href="{{ url_for('exportar_consulta') }}" class="btn btn-success">Exportar Todos a Excel</a>
         </div>
     </form>
 

@@ -150,15 +150,10 @@
 
         <div class="col-12">
             <button type="submit" class="btn btn-primary mt-2">Guardar Registro</button>
+            <a href="{{ url_for('consultar') }}" target="_blank" class="btn btn-info">Consultar Todos los Registros</a>
         </div>
 
     </form>
-
-    <div class="mb-3">
-        <a href="{{ url_for('consultar') }}" target="_blank" class="btn btn-info">
-        Consultar Todos los Registros
-        </a>
-    </div>
 
     <!-- TABLA DE REGISTROS -->
     <table class="table table-striped">
