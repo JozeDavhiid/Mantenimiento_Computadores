@@ -297,6 +297,19 @@ def generar_acta(rid):
                      download_name=f"Acta_Registro_{registro['id']}.pdf",
                      mimetype='application/pdf')
 
+@app.route('/consultar')
+def consultar():
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM mantenimiento ORDER BY id DESC")
+    registros = c.fetchall()
+    conn.close()
+
+    return render_template('consultar.html', registros=registros)
+
 # -----------------------
 # Main
 # -----------------------
