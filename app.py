@@ -293,69 +293,55 @@ def exportar():
 
 @app.route('/acta/<int:rid>')
 def acta_pdf(rid):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
-
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT * FROM mantenimiento WHERE id=%s", (rid,))
-    registro = c.fetchone()
+    conn = get_db_connection()
+    registro = conn.execute('SELECT * FROM registros WHERE id = %s', (rid,)).fetchone()
     conn.close()
 
     if not registro:
-        flash("Registro no encontrado", "warning")
-        return redirect(url_for('principal'))
+        return "Registro no encontrado", 404
 
-    # Evita errores por valores None
-    def safe(value):
-        return str(value or '').replace('\n', ' ').strip()
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    elements = []
 
-    # Importamos librerías PDF
-    from reportlab.lib.pagesizes import letter
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet
-
-    # Creamos PDF temporal
-    pdf_path = f"/tmp/acta_{rid}.pdf"
-    doc = SimpleDocTemplate(pdf_path, pagesize=letter)
     styles = getSampleStyleSheet()
-    content = []
+    elements.append(Paragraph("<b>ACTA DE MANTENIMIENTO</b>", styles["Title"]))
+    elements.append(Spacer(1, 12))
 
-    content.append(Paragraph("<b>ACTA DE MANTENIMIENTO</b>", styles['Title']))
-    content.append(Spacer(1, 12))
-
-    campos = [
-        ('Sede', registro.sede),
-        ('Fecha', registro.fecha),
-        ('Área', registro.area),
-        ('Técnico', registro.tecnico),
-        ('Nombre Máquina', registro.nombre_maquina),
-        ('Usuario Equipo', registro.usuario),
-        ('Tipo Equipo', registro.tipo_equipo),
-        ('Marca', registro.marca),
-        ('Modelo', registro.modelo),
-        ('Serial', registro.serial),
-        ('Sistema Operativo', registro.sistema_operativo),
-        ('Office', registro.office),
-        ('Antivirus', registro.antivirus),
-        ('Compresor', registro.compresor),
-        ('Control Remoto', registro.control_remoto),
-        ('Activo Fijo', registro.activo_fijo),
+    data = [
+        ['Campo', 'Valor'],
+        ('Sede', registro['sede']),
+        ('Fecha', str(registro['fecha'])),
+        ('Encargado', registro['encargado']),
+        ('Nombre', registro['nombre']),
+        ('Cargo', registro['cargo']),
+        ('Serial', registro['serial']),
+        ('Procesador', registro['procesador']),
+        ('Disco Duro', registro['disco_duro']),
+        ('RAM', registro['ram']),
+        ('Sistema Operativo', registro['sistema_operativo']),
+        ('Tareas Realizadas', registro['tareas']),
+        ('Estado', registro['estado']),
+        ('Observaciones', registro['observaciones']),
     ]
 
-    for etiqueta, valor in campos:
-        content.append(Paragraph(f"<b>{etiqueta}:</b> {safe(valor)}", styles['Normal']))
-        content.append(Spacer(1, 6))
+    table = Table(data, colWidths=[150, 350])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+    ]))
+    elements.append(table)
 
-    content.append(Spacer(1, 12))
-    content.append(Paragraph("<b>Observaciones:</b>", styles['Heading3']))
-    content.append(Paragraph(safe(registro.observaciones), styles['Normal']))
+    doc.build(elements)
+    pdf = buffer.getvalue()
+    buffer.close()
 
-    # Generar el PDF
-    doc.build(content)
+    return Response(pdf, mimetype='application/pdf',
+                    headers={'Content-Disposition': f'inline; filename=acta_{rid}.pdf'})
 
-    return send_file(pdf_path, as_attachment=True, download_name=f"Acta_{registro.id}.pdf")
-    
 @app.route('/consultar')
 def consultar():
     if 'usuario' not in session:
