@@ -199,8 +199,8 @@
                     <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-warning btn-sm">Editar</a>
                     <form action="{{ url_for('eliminar', rid=r.id) }}" method="POST" style="display:inline;">
                         <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
-                    </form>
-                    <a href="{{ url_for('acta_pdf', rid=r.id) }}" class="btn btn-success btn-sm">Acta</a>
+                        <a href="{{ url_for('acta_pdf', rid=r.id) }}" class="btn btn-success btn-sm">Acta</a>
+                    </form>                    
                 </td>
             </tr>
             {% endfor %}
