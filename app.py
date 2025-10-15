@@ -90,13 +90,58 @@ def consultar():
     if 'usuario' not in session:
         return redirect(url_for('login'))
 
+    # Parámetros de búsqueda y paginación
+    search = request.args.get('q', '').strip()
+    sede_filter = request.args.get('sede', 'Todas')
+    page = int(request.args.get('page', 1))
+    per_page = 15
+    offset = (page - 1) * per_page
+
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM mantenimiento ORDER BY id DESC")
+
+    # Construcción dinámica de la consulta
+    query = "SELECT * FROM mantenimiento WHERE 1=1"
+    params = []
+
+    if search:
+        like = f"%{search}%"
+        query += """ AND (
+            sede ILIKE %s OR area ILIKE %s OR tecnico ILIKE %s OR nombre_maquina ILIKE %s OR
+            usuario ILIKE %s OR tipo_equipo ILIKE %s OR marca ILIKE %s OR modelo ILIKE %s OR
+            serial ILIKE %s OR observaciones ILIKE %s
+        )"""
+        params += [like] * 10
+
+    if sede_filter and sede_filter != 'Todas':
+        query += " AND sede = %s"
+        params.append(sede_filter)
+
+    # Total para paginación
+    count_query = f"SELECT COUNT(*) FROM ({query}) AS subquery"
+    c.execute(count_query, params)
+    total = c.fetchone()['count']
+    total_pages = (total + per_page - 1) // per_page
+
+    # Obtener registros paginados
+    query += " ORDER BY id DESC LIMIT %s OFFSET %s"
+    params += [per_page, offset]
+    c.execute(query, params)
     registros = c.fetchall()
+
     conn.close()
 
-    return render_template('consultar.html', registros=registros)
+    sedes = ["Todas", "Nivel Central", "Barranquilla", "Soledad", "Santa Marta",
+             "El Banco", "Monteria", "Sincelejo", "Valledupar",
+             "El Carmen de Bolivar", "Magangue"]
+
+    return render_template('consultar.html',
+                           registros=registros,
+                           search=search,
+                           sede_filter=sede_filter,
+                           sedes=sedes,
+                           page=page,
+                           total_pages=total_pages)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():

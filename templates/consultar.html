@@ -9,10 +9,24 @@
     <div class="container mt-4">
         <h3 class="text-center mb-4">Consulta de Registros de Mantenimiento</h3>
 
-        <div class="text-end mb-3">
-            <a href="{{ url_for('exportar') }}" class="btn btn-success btn-sm">Exportar a Excel</a>
-            <a href="{{ url_for('principal') }}" class="btn btn-secondary btn-sm">Volver</a>
-        </div>
+        <form method="get" class="row g-2 mb-3">
+            <div class="col-md-4">
+                <input type="text" name="q" value="{{ search }}" class="form-control" placeholder="Buscar...">
+            </div>
+            <div class="col-md-3">
+                <select name="sede" class="form-select">
+                    {% for sede in sedes %}
+                    <option value="{{ sede }}" {% if sede_filter == sede %}selected{% endif %}>{{ sede }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+            </div>
+            <div class="col-md-2 text-end">
+                <a href="{{ url_for('exportar') }}" class="btn btn-success w-100">Exportar</a>
+            </div>
+        </form>
 
         <div class="table-responsive shadow-sm bg-white rounded p-3">
             <table class="table table-bordered table-hover align-middle">
@@ -59,12 +73,39 @@
                     {% else %}
                     <tr>
                         <td colspan="13" class="text-center text-muted py-4">
-                            No hay registros en la base de datos
+                            No hay registros disponibles.
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <!-- Paginación -->
+        {% if total_pages > 1 %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page > 1 %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('consultar', q=search, sede=sede_filter, page=page-1) }}">Anterior</a>
+                </li>
+                {% endif %}
+                {% for p in range(1, total_pages + 1) %}
+                <li class="page-item {% if p == page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('consultar', q=search, sede=sede_filter, page=p) }}">{{ p }}</a>
+                </li>
+                {% endfor %}
+                {% if page < total_pages %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('consultar', q=search, sede=sede_filter, page=page+1) }}">Siguiente</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+        <div class="text-center mt-3">
+            <a href="{{ url_for('principal') }}" class="btn btn-secondary">Volver</a>
         </div>
     </div>
 </body>
