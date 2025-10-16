@@ -361,5 +361,22 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 </script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Campos que deben forzarse a mayúsculas
+    const campos = ['nombre_maquina', 'marca', 'modelo', 'serial'];
+
+    campos.forEach(nombre => {
+        const input = document.querySelector(`[name="${nombre}"]`);
+        if (input) {
+            input.addEventListener('input', function() {
+                this.value = this.value.toUpperCase();
+            });
+        }
+    });
+});
+</script>
+
 </body>
 </html>
