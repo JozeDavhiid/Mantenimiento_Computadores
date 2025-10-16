@@ -86,7 +86,7 @@ def home():
     return redirect(url_for('login'))
 
 
-@app.route('/consultar')
+@app.route('/consultar_registro')
 def consultar():
     if 'usuario' not in session:
         return redirect(url_for('login'))
