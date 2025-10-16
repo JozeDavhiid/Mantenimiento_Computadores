@@ -121,7 +121,7 @@ def consultar():
     total = c.fetchone()['count']
     total_pages = (total + per_page - 1) // per_page
 
-    query += " ORDER BY fecha DESC LIMIT %s OFFSET %s"
+    query += " ORDER BY fecha ASC LIMIT %s OFFSET %s"
     params += [per_page, offset]
     c.execute(query, params)
     registros = c.fetchall()
@@ -221,7 +221,7 @@ def principal():
         flash('Registro guardado correctamente', 'success')
 
     # Últimos registros
-    c.execute("SELECT * FROM mantenimiento ORDER BY fecha DESC LIMIT 10")
+    c.execute("SELECT * FROM mantenimiento ORDER BY id DESC LIMIT 10")
     registros = c.fetchall()
 
     # Dashboard
