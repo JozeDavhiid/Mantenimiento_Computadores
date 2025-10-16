@@ -131,9 +131,9 @@ def consultar():
 
     conn.close()
 
-    sedes = ["Todas", "Nivel Central", "Atlantico", "Soledad", "Magdalena",
-             "El Banco", "Cordoba", "Sucre", "Cesar",
-             "Bolivar Centro", "Bolivar Sur"]
+    sedes = ["Todas", "Nivel Central", "Barranquilla", "Soledad", "Santa Marta",
+             "El Banco", "Monteria", "Sincelejo", "Valledupar",
+             "El Carmen de Bolivar", "Magangue"]
 
     return render_template('consultar.html',
                            registros=registros,
