@@ -234,45 +234,51 @@
     </div>
 
     <div class="row">
-      <div class="col-md-6 mb-4">
-        <div class="card shadow">
-          <div class="card-header bg-primary text-white fw-bold">Mantenimientos por Sede</div>
-          <div class="card-body chart-container">
-            <canvas id="chartSedes"></canvas>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3 mb-4">
+        <!-- === Mantenimientos por Sede === -->
+        <div class="col-md-6 mb-4">
             <div class="card shadow">
-                <div class="card-header bg-success text-white fw-bold">Tipos de Equipos</div>
-                <div class="card-body chart-container" style="height:220px;">
-                    <canvas id="chartEquipos"></canvas>
-                </div>
-                <div class="card-footer text-center fw-bold">
-                    Más común: {{ equipo_mas_comun }}
-                </div>
+            <div class="card-header bg-primary text-white fw-bold">Mantenimientos por Sede</div>
+            <div class="card-body chart-container">
+                <canvas id="chartSedes"></canvas>
             </div>
-       </div>
+            </div>
+        </div>
 
-        <div class="col-md-3 mb-4">
+        <!-- === Tendencia Mensual === -->
+        <div class="col-md-6 mb-4">
             <div class="card shadow">
-                <div class="card-header bg-info text-white fw-bold">Marcas Más Comunes</div>
-                <div class="card-body chart-container" style="height:220px;">
-                    <canvas id="chartMarcas"></canvas>
-                </div>
-                <div class="card-footer text-center fw-bold">
-                    Más común: {{ marca_mas_comun }}
-                </div>
+            <div class="card-header bg-warning text-white fw-bold">Tendencia Mensual</div>
+            <div class="card-body chart-container">
+                <canvas id="chartMeses"></canvas>
+            </div>
             </div>
         </div>
-      <div class="col-md-12 mb-4">
-        <div class="card shadow">
-          <div class="card-header bg-warning text-white fw-bold">Tendencia Mensual</div>
-          <div class="card-body chart-container">
-            <canvas id="chartMeses"></canvas>
-          </div>
+
+        <!-- === Tipos de Equipos === -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow">
+            <div class="card-header bg-success text-white fw-bold">Tipos de Equipos</div>
+            <div class="card-body chart-container" style="height: 360px;">
+                <canvas id="chartEquipos"></canvas>
+            </div>
+            <div class="card-footer text-center fw-bold">
+                Más común: {{ equipo_mas_comun }}
+            </div>
+            </div>
         </div>
-      </div>
+
+        <!-- === Marcas Más Comunes === -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow">
+            <div class="card-header bg-info text-white fw-bold">Marcas Más Comunes</div>
+            <div class="card-body chart-container" style="height: 360px;">
+                <canvas id="chartMarcas"></canvas>
+            </div>
+            <div class="card-footer text-center fw-bold">
+                Más común: {{ marca_mas_comun }}
+            </div>
+            </div>
+        </div>
     </div>
   </div>
 
