@@ -118,14 +118,15 @@
               <td>{{ r.usuario }}</td>
               <td>{{ r.marca }}</td>
               <td>
-                <div class="btn-group">
-                  <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-warning btn-sm">Editar</a>
-                  <a href="{{ url_for('acta_pdf', rid=r.id) }}" class="btn btn-success btn-sm">Acta</a>
-                  <form action="{{ url_for('eliminar', rid=r.id) }}" method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar este registro?');">
-                    <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
-                  </form>
+              <div class="d-flex gap-2">
+                    <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-warning btn-sm">Editar</a>
+                    <a href="{{ url_for('acta_pdf', rid=r.id) }}" class="btn btn-success btn-sm">Acta</a>
+                    <form action="{{ url_for('eliminar', rid=r.id) }}" method="POST" 
+                        onsubmit="return confirm('¿Seguro que deseas eliminar este registro?');" class="m-0 p-0">
+                        <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+                    </form>
                 </div>
-              </td>
+            </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -194,22 +195,6 @@ function sortTable(n) {
     }
   }
 }
-</script>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Campos que deben forzarse a mayúsculas
-    const campos = ['nombre_maquina', 'marca', 'modelo', 'serial'];
-
-    campos.forEach(nombre => {
-        const input = document.querySelector(`[name="${nombre}"]`);
-        if (input) {
-            input.addEventListener('input', function() {
-                this.value = this.value.toUpperCase();
-            });
-        }
-    });
-});
 </script>
 
 </body>
