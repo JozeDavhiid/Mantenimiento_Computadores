@@ -7,14 +7,34 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     body {
-      background-color: #f8f9fa;
+        background-color: #f8f9fa;
     }
+
     .chart-container {
-      position: relative;
-      height: 320px;
+        position: relative;
+        height: 320px;
     }
+
+    .chart-large {
+        height: 400px !important;
+    }
+
+    .card {
+        border: none;
+        border-radius: 12px;
+    }
+
+    .card-header {
+        border-top-left-radius: 12px;
+        border-top-right-radius: 12px;
+    }
+
+    .card-footer {
+        background-color: #f8f9fa;
+    }
+
     table th {
-      cursor: pointer;
+        cursor: pointer;
     }
   </style>
 </head>
@@ -233,52 +253,55 @@
       </div>
     </div>
 
+    <!-- ===================== -->
+    <!-- GRÁFICOS -->
+    <!-- ===================== -->
     <div class="row">
-        <!-- === Mantenimientos por Sede === -->
-        <div class="col-md-6 mb-4">
-            <div class="card shadow">
-            <div class="card-header bg-primary text-white fw-bold">Mantenimientos por Sede</div>
-            <div class="card-body chart-container">
-                <canvas id="chartSedes"></canvas>
-            </div>
-            </div>
+    <!-- === Mantenimientos por Sede === -->
+    <div class="col-md-6 mb-4">
+        <div class="card shadow">
+        <div class="card-header bg-primary text-white fw-bold">Mantenimientos por Sede</div>
+        <div class="card-body chart-container">
+            <canvas id="chartSedes"></canvas>
         </div>
+        </div>
+    </div>
 
-        <!-- === Tendencia Mensual === -->
-        <div class="col-md-6 mb-4">
-            <div class="card shadow">
-            <div class="card-header bg-warning text-white fw-bold">Tendencia Mensual</div>
-            <div class="card-body chart-container">
-                <canvas id="chartMeses"></canvas>
-            </div>
-            </div>
+    <!-- === Tendencia Mensual === -->
+    <div class="col-md-6 mb-4">
+        <div class="card shadow">
+        <div class="card-header bg-warning text-white fw-bold">Tendencia Mensual</div>
+        <div class="card-body chart-container">
+            <canvas id="chartMeses"></canvas>
         </div>
+        </div>
+    </div>
 
-        <!-- === Tipos de Equipos === -->
-        <div class="col-md-6 mb-4">
-            <div class="card shadow">
-            <div class="card-header bg-success text-white fw-bold">Tipos de Equipos</div>
-            <div class="card-body chart-container" style="height: 360px;">
-                <canvas id="chartEquipos"></canvas>
-            </div>
-            <div class="card-footer text-center fw-bold">
-                Más común: {{ equipo_mas_comun }}
-            </div>
-            </div>
+    <!-- === Tipos de Equipos === -->
+    <div class="col-md-6 mb-4">
+        <div class="card shadow">
+        <div class="card-header bg-success text-white fw-bold">Tipos de Equipos</div>
+        <div class="card-body chart-container chart-large">
+            <canvas id="chartEquipos"></canvas>
         </div>
+        <div class="card-footer text-center fw-bold">
+            Más común: {{ equipo_mas_comun }}
+        </div>
+        </div>
+    </div>
 
-        <!-- === Marcas Más Comunes === -->
-        <div class="col-md-6 mb-4">
-            <div class="card shadow">
-            <div class="card-header bg-info text-white fw-bold">Marcas Más Comunes</div>
-            <div class="card-body chart-container" style="height: 360px;">
-                <canvas id="chartMarcas"></canvas>
-            </div>
-            <div class="card-footer text-center fw-bold">
-                Más común: {{ marca_mas_comun }}
-            </div>
-            </div>
+    <!-- === Marcas Más Comunes === -->
+    <div class="col-md-6 mb-4">
+        <div class="card shadow">
+        <div class="card-header bg-info text-white fw-bold">Marcas Más Comunes</div>
+        <div class="card-body chart-container chart-large">
+            <canvas id="chartMarcas"></canvas>
         </div>
+        <div class="card-footer text-center fw-bold">
+            Más común: {{ marca_mas_comun }}
+        </div>
+        </div>
+    </div>
     </div>
   </div>
 
@@ -369,16 +392,28 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   new Chart(document.getElementById('chartMarcas'), {
-    type: 'pie',
-    data: {
-        labels: {{ marca_labels|tojson }},
-        datasets: [{
-            data: {{ marca_counts|tojson }},
-            backgroundColor: ['#17a2b8', '#20c997', '#6f42c1', '#ffc107', '#dc3545', '#007bff']
-        }]
+  type: 'bar',
+  data: {
+    labels: {{ marca_labels|tojson }},
+    datasets: [{
+      label: 'Cantidad por Marca',
+      data: {{ marca_counts|tojson }},
+      backgroundColor: ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6f42c1', '#20c997']
+    }]
+  },
+  options: {
+    indexAxis: 'y', // 🔹 Barras horizontales
+    responsive: true,
+    scales: {
+      x: {
+        beginAtZero: true
+      }
     },
-    options: { responsive: true }
-   });
+    plugins: {
+      legend: { display: false }
+    }
+  }
+  });
 
   // === Ordenar tabla ===
   document.querySelectorAll("#tablaRegistros th").forEach(header => {

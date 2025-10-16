@@ -94,7 +94,7 @@ def consultar():
     search = request.args.get('q', '').strip()
     sede_filter = request.args.get('sede', 'Todas')
     page = int(request.args.get('page', 1))
-    per_page = 15
+    per_page = 20
     offset = (page - 1) * per_page
 
     conn = get_db_connection()
