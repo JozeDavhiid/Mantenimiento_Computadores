@@ -232,11 +232,13 @@
                     <td>{{ r.modelo }}</td>
                     <td>{{ r.serial }}</td>
                     <td class="text-nowrap">
-                        <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-warning btn-sm">Editar</a>
-                        <a href="{{ url_for('acta_pdf', rid=r.id) }}" class="btn btn-success btn-sm">Acta</a>
-                        <form action="{{ url_for('eliminar', rid=r.id) }}" method="POST" style="display:inline;">
-                            <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
-                        </form>
+                        <div class="btn-group" role="group">
+                            <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-warning btn-sm">Editar</a>
+                            <a href="{{ url_for('acta_pdf', rid=r.id) }}" class="btn btn-success btn-sm">Acta</a>
+                            <form action="{{ url_for('eliminar', rid=r.id) }}" method="POST" style="display:inline;">
+                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('¿Seguro que deseas eliminar este registro?')">Eliminar</button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
