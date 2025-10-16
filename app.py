@@ -366,7 +366,22 @@ def acta_pdf(rid):
                      download_name=f"Acta_Registro_{registro['id']}.pdf",
                      mimetype='application/pdf')
 
+@app.route('/obtener_registro/<int:rid>')
+def obtener_registro(rid):
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
 
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM mantenimiento WHERE id=%s", (rid,))
+    registro = c.fetchone()
+    conn.close()
+
+    if not registro:
+        flash('Registro no encontrado', 'warning')
+        return redirect(url_for('principal'))
+
+    return render_template('editar.html', registro=registro)
 # -----------------------
 # Main
 # -----------------------
