@@ -361,6 +361,18 @@ document.addEventListener('DOMContentLoaded', function() {
     options: { responsive: true }
   });
 
+  new Chart(document.getElementById('chartMarcas'), {
+    type: 'pie',
+    data: {
+        labels: {{ equipo_labels|tojson }},
+        datasets: [{
+            data: {{ equipo_counts|tojson }},
+            backgroundColor: ['#007bff', '#28a745', '#ffc107', '#dc3545', '#6f42c1', '#20c997']
+        }]
+    },
+    options: { responsive: true }
+  });
+
   // === Ordenar tabla ===
   document.querySelectorAll("#tablaRegistros th").forEach(header => {
     header.addEventListener("click", () => {
