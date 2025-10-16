@@ -1,347 +1,365 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Panel Principal - Mantenimiento</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <style>
-        body {
-            background-color: #f8f9fa;
-        }
-        .chart-container {
-            position: relative;
-            height: 320px;
-        }
-        .btn-group .btn {
-            margin-right: 4px;
-        }
-        .btn-group form {
-            display: inline-block;
-            margin: 0;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Panel Principal - Mantenimiento</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    body {
+      background-color: #f8f9fa;
+    }
+    .chart-container {
+      position: relative;
+      height: 320px;
+    }
+    table th {
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
 
+<!-- ===================== -->
+<!-- NAVBAR -->
+<!-- ===================== -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand fw-bold" href="#">🖥️ Mantenimiento</a>
-        <div class="d-flex">
-            <span class="navbar-text text-white me-3">👋 Hola, {{ nombre }}</span>
-            <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">Cerrar sesión</a>
-        </div>
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="#">🖥️ Mantenimiento</a>
+    <div class="d-flex">
+      <span class="navbar-text text-white me-3">👋 Hola, {{ nombre }}</span>
+      <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">Cerrar sesión</a>
     </div>
+  </div>
 </nav>
 
 <div class="container-fluid my-4">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-          </div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
-
-    <!-- ===================== -->
-    <!-- FORMULARIO -->
-    <!-- ===================== -->
-    <div class="card shadow mb-4">
-        <div class="card-header bg-primary text-white fw-bold">Registrar Nuevo Mantenimiento</div>
-        <div class="card-body">
-            <form method="POST" class="row g-3">
-                <input type="hidden" name="action" value="guardar">
-
-                <div class="col-md-3">
-                    <label>Sede</label>
-                    <select name="sede" class="form-select">
-                        <option>Nivel Central</option>
-                        <option>Barranquilla</option>
-                        <option>Soledad</option>
-                        <option>Santa Marta</option>
-                        <option>El Banco</option>
-                        <option>Monteria</option>
-                        <option>Sincelejo</option>
-                        <option>El Carmen de Bolivar</option>
-                        <option>Magangue</option>
-                        <option>Valledupar</option>
-                    </select>
-                </div>
-
-                <div class="col-md-3">
-                    <label>Fecha</label>
-                    <input type="date" name="fecha" class="form-control" value="{{ hoy }}">
-                </div>
-
-                <div class="col-md-3">
-                    <label>Área</label>
-                    <input type="text" name="area" class="form-control">
-                </div>
-
-                <div class="col-md-3">
-                    <label>Nombre Máquina</label>
-                    <input type="text" name="nombre_maquina" class="form-control" required>
-                </div>
-
-                <div class="col-md-3">
-                    <label>Usuario Equipo</label>
-                    <input type="text" name="usuario_equipo" class="form-control">
-                </div>
-
-                <div class="col-md-3">
-                    <label>Tipo de Equipo</label>
-                    <select name="tipo_equipo" class="form-select">
-                        <option>Portátil</option>
-                        <option>All in One</option>
-                        <option>Escritorio</option>
-                        <option>Servidor</option>
-                        <option>Impresora</option>
-                        <option>Otro</option>
-                    </select>
-                </div>
-
-                <div class="col-md-3">
-                    <label>Marca</label>
-                    <input type="text" name="marca" class="form-control">
-                </div>
-
-                <div class="col-md-3">
-                    <label>Modelo</label>
-                    <input type="text" name="modelo" class="form-control">
-                </div>
-
-                <div class="col-md-3">
-                    <label>Serial</label>
-                    <input type="text" name="serial" class="form-control">
-                </div>
-
-                <div class="col-md-3">
-                    <label>Sistema Operativo</label>
-                    <select name="so" class="form-select">
-                        <option>Windows 10 Pro 22H2</option>
-                        <option>Windows 11 Pro 23H2</option>
-                        <option>Windows 11 Pro 24H2</option>
-                        <option>MacOS</option>
-                        <option>Linux</option>
-                        <option>N/A</option>
-                    </select>
-                </div>
-
-                <div class="col-md-3">
-                    <label>Office</label>
-                    <select name="office" class="form-select">
-                        <option>Microsoft Office 2013</option>
-                        <option>Microsoft Office 2019</option>
-                        <option>Microsoft Office 2021</option>
-                        <option>Microsoft 365</option>
-                        <option>No Instalado</option>
-                        <option>N/A</option>
-                    </select>
-                </div>
-
-                <div class="col-md-3">
-                    <label>Antivirus</label>
-                    <select name="antivirus" class="form-select">
-                        <option>Kaspersky Endpoint</option>
-                        <option>Windows Defender</option>
-                        <option>Avast</option>
-                        <option>No Instalado</option>
-                        <option>N/A</option>
-                    </select>
-                </div>
-
-                <div class="col-md-3">
-                    <label>Compresor</label>
-                    <select name="compresor" class="form-select">
-                        <option>WinRAR</option>
-                        <option>7-Zip</option>
-                        <option>PeaZip</option>
-                        <option>N/A</option>
-                    </select>
-                </div>
-
-                <div class="col-md-3">
-                    <label>Control Remoto</label>
-                    <select name="control_remoto" class="form-select">
-                        <option>AnyDesk</option>
-                        <option>RustDesk</option>
-                        <option>TeamViewer</option>
-                        <option>No Instalado</option>
-                        <option>N/A</option>
-                    </select>
-                </div>
-
-                <div class="col-md-3">
-                    <label>Activo Fijo</label>
-                    <input type="text" name="activo_fijo" class="form-control">
-                </div>
-
-                <div class="col-12">
-                    <label>Observaciones</label>
-                    <textarea name="observaciones" class="form-control" rows="4"></textarea>
-                </div>
-
-                <div class="d-flex justify-content-start gap-2 mt-3">
-                    <button type="submit" class="btn btn-primary">Guardar</button>
-                    <a href="{{ url_for('consultar') }}" class="btn btn-info" target="_blank">Consultar Registros</a>
-                    <a href="{{ url_for('exportar') }}" class="btn btn-success">Exportar Excel</a>
-                </div>
-            </form>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
-    </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
 
-    <!-- ===================== -->
-    <!-- DASHBOARD -->
-    <!-- ===================== -->
+  <!-- ===================== -->
+  <!-- FORMULARIO DE REGISTRO -->
+  <!-- ===================== -->
+  <div class="card shadow mb-4">
+    <div class="card-header bg-primary text-white fw-bold">Registrar Nuevo Mantenimiento</div>
+    <div class="card-body">
+      <form method="POST" class="row g-3">
+        <input type="hidden" name="action" value="guardar">
+
+        <div class="col-md-3">
+          <label>Sede</label>
+          <select name="sede" class="form-select">
+            <option>Nivel Central</option>
+            <option>Barranquilla</option>
+            <option>Soledad</option>
+            <option>Santa Marta</option>
+            <option>El Banco</option>
+            <option>Monteria</option>
+            <option>Sincelejo</option>
+            <option>El Carmen de Bolivar</option>
+            <option>Magangue</option>
+            <option>Valledupar</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label>Fecha</label>
+          <input type="date" name="fecha" class="form-control" value="{{ hoy }}">
+        </div>
+
+        <div class="col-md-3">
+          <label>Área</label>
+          <input type="text" name="area" class="form-control">
+        </div>
+
+        <div class="col-md-3">
+          <label>Nombre Máquina</label>
+          <input type="text" name="nombre_maquina" class="form-control" required>
+        </div>
+
+        <div class="col-md-3">
+          <label>Usuario Equipo</label>
+          <input type="text" name="usuario_equipo" class="form-control">
+        </div>
+
+        <div class="col-md-3">
+          <label>Tipo de Equipo</label>
+          <select name="tipo_equipo" class="form-select">
+            <option>Portátil</option>
+            <option>All in One</option>
+            <option>Escritorio</option>
+            <option>Servidor</option>
+            <option>Impresora</option>
+            <option>Otro</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label>Marca</label>
+          <input type="text" name="marca" class="form-control">
+        </div>
+
+        <div class="col-md-3">
+          <label>Modelo</label>
+          <input type="text" name="modelo" class="form-control">
+        </div>
+
+        <div class="col-md-3">
+          <label>Serial</label>
+          <input type="text" name="serial" class="form-control">
+        </div>
+
+        <div class="col-md-3">
+          <label>Sistema Operativo</label>
+          <select name="so" class="form-select">
+            <option>Windows 10 Pro 22H2</option>
+            <option>Windows 11 Pro 23H2</option>
+            <option>Windows 11 Pro 24H2</option>
+            <option>MacOS</option>
+            <option>Linux</option>
+            <option>N/A</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label>Office</label>
+          <select name="office" class="form-select">
+            <option>Microsoft Office 2013</option>
+            <option>Microsoft Office 2019</option>
+            <option>Microsoft Office 2021</option>
+            <option>Microsoft 365</option>
+            <option>No Instalado</option>
+            <option>N/A</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label>Antivirus</label>
+          <select name="antivirus" class="form-select">
+            <option>Kaspersky Endpoint</option>
+            <option>Windows Defender</option>
+            <option>Avast</option>
+            <option>No Instalado</option>
+            <option>N/A</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label>Compresor</label>
+          <select name="compresor" class="form-select">
+            <option>WinRAR</option>
+            <option>7-Zip</option>
+            <option>PeaZip</option>
+            <option>N/A</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label>Control Remoto</label>
+          <select name="control_remoto" class="form-select">
+            <option>AnyDesk</option>
+            <option>RustDesk</option>
+            <option>TeamViewer</option>
+            <option>No Instalado</option>
+            <option>N/A</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label>Activo Fijo</label>
+          <input type="text" name="activo_fijo" class="form-control">
+        </div>
+
+        <div class="col-12">
+          <label>Observaciones</label>
+          <textarea name="observaciones" class="form-control" rows="4"></textarea>
+        </div>
+
+        <div class="d-flex justify-content-start gap-2 mt-3">
+          <button type="submit" class="btn btn-primary">Guardar</button>
+          <a href="{{ url_for('consultar_registros') }}" class="btn btn-info" target="_blank">Consultar Registros</a>
+          <a href="{{ url_for('exportar') }}" class="btn btn-success">Exportar Excel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== -->
+  <!-- DASHBOARD -->
+  <!-- ===================== -->
+  <div class="container-fluid mt-5">
+    <h3 class="text-center mb-4 fw-bold">📊 Dashboard de Estadísticas</h3>
+
     <div class="row text-center mb-4">
-        <div class="col-md-3">
-            <div class="card shadow-sm border-primary">
-                <div class="card-body">
-                    <h5 class="text-primary fw-bold">Total Mantenimientos</h5>
-                    <h2>{{ total_mantenimientos }}</h2>
-                </div>
-            </div>
+      <div class="col-md-3 mb-3">
+        <div class="card shadow-sm border-success">
+          <div class="card-body">
+            <h6 class="fw-bold">Total Registros</h6>
+            <h2 class="text-success">{{ total_mantenimientos }}</h2>
+          </div>
         </div>
-        <div class="col-md-3">
-            <div class="card shadow-sm border-success">
-                <div class="card-body">
-                    <h5 class="text-success fw-bold">Técnicos Activos</h5>
-                    <h2>{{ total_tecnicos }}</h2>
-                </div>
-            </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="card shadow-sm border-primary">
+          <div class="card-body">
+            <h6 class="fw-bold">Técnicos</h6>
+            <h2 class="text-primary">{{ total_tecnicos }}</h2>
+          </div>
         </div>
-        <div class="col-md-3">
-            <div class="card shadow-sm border-warning">
-                <div class="card-body">
-                    <h5 class="text-warning fw-bold">Mantenimientos del Mes</h5>
-                    <h2>{{ mantenimientos_mes }}</h2>
-                </div>
-            </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="card shadow-sm border-warning">
+          <div class="card-body">
+            <h6 class="fw-bold">Mantenimientos del Mes</h6>
+            <h2 class="text-warning">{{ mantenimientos_mes }}</h2>
+          </div>
         </div>
-        <div class="col-md-3">
-            <div class="card shadow-sm border-info">
-                <div class="card-body">
-                    <h5 class="text-info fw-bold">Equipo Más Común</h5>
-                    <h4>{{ equipo_mas_comun }}</h4>
-                </div>
-            </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="card shadow-sm border-danger">
+          <div class="card-body">
+            <h6 class="fw-bold">Equipo Más Común</h6>
+            <h4 class="text-danger">{{ equipo_mas_comun }}</h4>
+          </div>
         </div>
+      </div>
     </div>
 
-    <!-- ===================== -->
-    <!-- GRÁFICOS -->
-    <!-- ===================== -->
     <div class="row">
-        <div class="col-md-6 mb-4">
-            <div class="card shadow">
-                <div class="card-header bg-primary text-white fw-bold">Mantenimientos por Sede</div>
-                <div class="card-body chart-container">
-                    <canvas id="chartSedes"></canvas>
-                </div>
-            </div>
+      <div class="col-md-6 mb-4">
+        <div class="card shadow">
+          <div class="card-header bg-primary text-white fw-bold">Mantenimientos por Sede</div>
+          <div class="card-body chart-container">
+            <canvas id="chartSedes"></canvas>
+          </div>
         </div>
-        <div class="col-md-6 mb-4">
-            <div class="card shadow">
-                <div class="card-header bg-success text-white fw-bold">Tipos de Equipos</div>
-                <div class="card-body chart-container">
-                    <canvas id="chartEquipos"></canvas>
-                </div>
-            </div>
+      </div>
+      <div class="col-md-6 mb-4">
+        <div class="card shadow">
+          <div class="card-header bg-success text-white fw-bold">Tipos de Equipos</div>
+          <div class="card-body chart-container">
+            <canvas id="chartEquipos"></canvas>
+          </div>
         </div>
-        <div class="col-md-12 mb-4">
-            <div class="card shadow">
-                <div class="card-header bg-warning text-white fw-bold">Tendencia Mensual</div>
-                <div class="card-body chart-container">
-                    <canvas id="chartMeses"></canvas>
-                </div>
-            </div>
+      </div>
+      <div class="col-md-12 mb-4">
+        <div class="card shadow">
+          <div class="card-header bg-warning text-white fw-bold">Tendencia Mensual</div>
+          <div class="card-body chart-container">
+            <canvas id="chartMeses"></canvas>
+          </div>
         </div>
+      </div>
     </div>
+  </div>
 
-    <!-- ===================== -->
-    <!-- TABLA -->
-    <!-- ===================== -->
-    <div class="card shadow">
-        <div class="card-header bg-dark text-white fw-bold">Últimos Registros</div>
-        <div class="card-body">
-            <table class="table table-striped table-hover align-middle">
-                <thead class="table-dark">
-                    <tr>
-                        <th>ID</th>
-                        <th>Sede</th>
-                        <th>Fecha</th>
-                        <th>Técnico</th>
-                        <th>Equipo</th>
-                        <th>Marca</th>
-                        <th>Modelo</th>
-                        <th>Serial</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for r in registros %}
-                    <tr>
-                        <td>{{ r.id }}</td>
-                        <td>{{ r.sede }}</td>
-                        <td>{{ r.fecha }}</td>
-                        <td>{{ r.tecnico }}</td>
-                        <td>{{ r.tipo_equipo }}</td>
-                        <td>{{ r.marca }}</td>
-                        <td>{{ r.modelo }}</td>
-                        <td>{{ r.serial }}</td>
-                        <td>
-                            <div class="btn-group">
-                                <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-warning btn-sm">Editar</a>
-                                <a href="{{ url_for('acta_pdf', rid=r.id) }}" class="btn btn-success btn-sm">Acta</a>
-                                <form action="{{ url_for('eliminar', rid=r.id) }}" method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar este registro?');">
-                                    <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+  <!-- ===================== -->
+  <!-- TABLA DE REGISTROS -->
+  <!-- ===================== -->
+  <div class="card shadow mt-5">
+    <div class="card-header bg-dark text-white fw-bold">Últimos Registros</div>
+    <div class="card-body">
+      <table class="table table-striped table-hover align-middle" id="tablaRegistros">
+        <thead class="table-dark">
+          <tr>
+            <th>ID</th>
+            <th>Sede</th>
+            <th>Fecha</th>
+            <th>Técnico</th>
+            <th>Equipo</th>
+            <th>Marca</th>
+            <th>Modelo</th>
+            <th>Serial</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in registros %}
+          <tr>
+            <td>{{ r.id }}</td>
+            <td>{{ r.sede }}</td>
+            <td>{{ r.fecha }}</td>
+            <td>{{ r.tecnico }}</td>
+            <td>{{ r.tipo_equipo }}</td>
+            <td>{{ r.marca }}</td>
+            <td>{{ r.modelo }}</td>
+            <td>{{ r.serial }}</td>
+            <td>
+              <div class="btn-group">
+                <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-warning btn-sm">Editar</a>
+                <a href="{{ url_for('acta_pdf', rid=r.id) }}" class="btn btn-success btn-sm">Acta</a>
+                <form action="{{ url_for('eliminar', rid=r.id) }}" method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar este registro?');" class="d-inline">
+                  <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
+  </div>
 </div>
 
+<!-- ===================== -->
+<!-- JS -->
+<!-- ===================== -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    new Chart(document.getElementById('chartSedes'), {
-        type: 'bar',
-        data: {
-            labels: {{ sede_labels|tojson }},
-            datasets: [{ label: 'Mantenimientos', data: {{ sede_counts|tojson }}, backgroundColor: '#007bff' }]
-        },
-        options: { responsive: true, plugins: { legend: { display: false } } }
-    });
+  // === Chart.js ===
+  new Chart(document.getElementById('chartSedes'), {
+    type: 'bar',
+    data: {
+      labels: {{ sede_labels|tojson }},
+      datasets: [{ label: 'Mantenimientos', data: {{ sede_counts|tojson }}, backgroundColor: '#007bff' }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
 
-    new Chart(document.getElementById('chartEquipos'), {
-        type: 'pie',
-        data: {
-            labels: {{ equipo_labels|tojson }},
-            datasets: [{ data: {{ equipo_counts|tojson }}, backgroundColor: ['#28a745','#ffc107','#17a2b8','#6f42c1','#dc3545','#20c997'] }]
-        },
-        options: { responsive: true }
-    });
+  new Chart(document.getElementById('chartEquipos'), {
+    type: 'pie',
+    data: {
+      labels: {{ equipo_labels|tojson }},
+      datasets: [{ data: {{ equipo_counts|tojson }}, backgroundColor: ['#28a745','#ffc107','#17a2b8','#6f42c1','#dc3545','#20c997'] }]
+    },
+    options: { responsive: true }
+  });
 
-    new Chart(document.getElementById('chartMeses'), {
-        type: 'line',
-        data: {
-            labels: {{ meses_labels|tojson }},
-            datasets: [{ label: 'Mantenimientos', data: {{ meses_counts|tojson }}, borderColor: '#ffc107', fill: true }]
-        },
-        options: { responsive: true }
+  new Chart(document.getElementById('chartMeses'), {
+    type: 'line',
+    data: {
+      labels: {{ meses_labels|tojson }},
+      datasets: [{ label: 'Mantenimientos', data: {{ meses_counts|tojson }}, borderColor: '#ffc107', fill: true }]
+    },
+    options: { responsive: true }
+  });
+
+  // === Ordenar tabla ===
+  document.querySelectorAll("#tablaRegistros th").forEach(header => {
+    header.addEventListener("click", () => {
+      const table = header.closest("table");
+      const index = Array.from(header.parentNode.children).indexOf(header);
+      const asc = header.classList.toggle("asc");
+      Array.from(table.querySelector("tbody").rows)
+        .sort((a, b) => {
+          const A = a.cells[index].innerText.trim();
+          const B = b.cells[index].innerText.trim();
+          return asc ? A.localeCompare(B, undefined, { numeric: true }) : B.localeCompare(A, undefined, { numeric: true });
+        })
+        .forEach(tr => table.querySelector("tbody").appendChild(tr));
     });
+  });
 });
 </script>
-
 </body>
 </html>
-
