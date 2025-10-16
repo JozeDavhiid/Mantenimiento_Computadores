@@ -86,6 +86,62 @@ def home():
     return redirect(url_for('login'))
 
 
+# ✅ Ruta restaurada /consultar
+@app.route('/consultar')
+def consultar():
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    search = request.args.get('q', '').strip()
+    sede_filter = request.args.get('sede', 'Todas')
+    page = int(request.args.get('page', 1))
+    per_page = 15
+    offset = (page - 1) * per_page
+
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    query = "SELECT * FROM mantenimiento WHERE 1=1"
+    params = []
+
+    if search:
+        like = f"%{search}%"
+        query += """ AND (
+            sede ILIKE %s OR area ILIKE %s OR tecnico ILIKE %s OR nombre_maquina ILIKE %s OR
+            usuario ILIKE %s OR tipo_equipo ILIKE %s OR marca ILIKE %s OR modelo ILIKE %s OR
+            serial ILIKE %s OR observaciones ILIKE %s
+        )"""
+        params += [like] * 10
+
+    if sede_filter and sede_filter != 'Todas':
+        query += " AND sede = %s"
+        params.append(sede_filter)
+
+    count_query = f"SELECT COUNT(*) FROM ({query}) AS subquery"
+    c.execute(count_query, params)
+    total = c.fetchone()['count']
+    total_pages = (total + per_page - 1) // per_page
+
+    query += " ORDER BY fecha DESC LIMIT %s OFFSET %s"
+    params += [per_page, offset]
+    c.execute(query, params)
+    registros = c.fetchall()
+
+    conn.close()
+
+    sedes = ["Todas", "Nivel Central", "Barranquilla", "Soledad", "Santa Marta",
+             "El Banco", "Monteria", "Sincelejo", "Valledupar",
+             "El Carmen de Bolivar", "Magangue"]
+
+    return render_template('consultar.html',
+                           registros=registros,
+                           search=search,
+                           sede_filter=sede_filter,
+                           sedes=sedes,
+                           page=page,
+                           total_pages=total_pages)
+
+
 @app.route('/principal', methods=['GET', 'POST'])
 def principal():
     if 'usuario' not in session:
@@ -122,47 +178,35 @@ def principal():
         conn.commit()
         flash('Registro guardado correctamente', 'success')
 
-    # Cargar registros recientes
+    # Registros recientes
     c.execute("SELECT * FROM mantenimiento ORDER BY fecha DESC LIMIT 10")
     registros = c.fetchall()
 
-    # 🔹 Dashboard de estadísticas
-    # Total mantenimientos
+    # Dashboard estadísticas
     c.execute("SELECT COUNT(*) AS total FROM mantenimiento")
     total_mantenimientos = c.fetchone()['total']
 
-    # Total técnicos distintos
     c.execute("SELECT COUNT(DISTINCT tecnico) AS total_tecnicos FROM mantenimiento")
     total_tecnicos = c.fetchone()['total_tecnicos']
 
-    # Mantenimientos del mes actual
     mes_actual = date.today().strftime("%Y-%m")
     c.execute("SELECT COUNT(*) AS total_mes FROM mantenimiento WHERE fecha LIKE %s", (f"{mes_actual}%",))
     mantenimientos_mes = c.fetchone()['total_mes']
 
-    # Tipo de equipo más común
-    c.execute("""
-        SELECT tipo_equipo, COUNT(*) AS cantidad 
-        FROM mantenimiento 
-        GROUP BY tipo_equipo 
-        ORDER BY cantidad DESC LIMIT 1
-    """)
+    c.execute("""SELECT tipo_equipo, COUNT(*) AS cantidad FROM mantenimiento GROUP BY tipo_equipo ORDER BY cantidad DESC LIMIT 1""")
     equipo_mas_comun = c.fetchone()
     equipo_mas_comun = equipo_mas_comun['tipo_equipo'] if equipo_mas_comun else 'N/A'
 
-    # Mantenimientos por sede (para gráfico de barras)
     c.execute("SELECT sede, COUNT(*) FROM mantenimiento GROUP BY sede ORDER BY sede")
     sedes_data = c.fetchall()
     sede_labels = [r['sede'] for r in sedes_data]
     sede_counts = [r['count'] for r in sedes_data]
 
-    # Tipos de equipo (para gráfico circular)
     c.execute("SELECT tipo_equipo, COUNT(*) FROM mantenimiento GROUP BY tipo_equipo")
     equipos_data = c.fetchall()
     equipo_labels = [r['tipo_equipo'] for r in equipos_data]
     equipo_counts = [r['count'] for r in equipos_data]
 
-    # Tendencia mensual (gráfico de línea)
     c.execute("""
         SELECT TO_CHAR(TO_DATE(fecha, 'YYYY-MM-DD'), 'Mon') AS mes, COUNT(*) 
         FROM mantenimiento 
