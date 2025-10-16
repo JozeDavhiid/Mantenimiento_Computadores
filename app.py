@@ -242,12 +242,10 @@ def principal():
     equipo_mas_comun = c.fetchone()
     equipo_mas_comun = equipo_mas_comun['tipo_equipo'] if equipo_mas_comun else 'N/A'
 
-    c.execute("""SELECT marca, COUNT(*) AS cantidad 
-                FROM mantenimiento 
-                GROUP BY marca 
-                ORDER BY cantidad DESC LIMIT 1""")
-    marca_mas_comun = c.fetchone()
-    marca_mas_comun = marca_mas_comun['marca'] if marca_mas_comun else 'N/A'
+    c.execute("SELECT marca, COUNT(*) FROM mantenimiento GROUP BY marca ORDER BY COUNT(*) DESC LIMIT 6")
+    marcas_data = c.fetchall()
+    marca_labels = [r['marca'] for r in marcas_data]
+    marca_counts = [r['count'] for r in marcas_data]
 
     c.execute("SELECT sede, COUNT(*) FROM mantenimiento GROUP BY sede ORDER BY sede")
     sedes_data = c.fetchall()
@@ -283,6 +281,8 @@ def principal():
                        sede_counts=sede_counts,
                        equipo_labels=equipo_labels,
                        equipo_counts=equipo_counts,
+                       marca_labels=marca_labels,
+                       marca_counts=marca_counts,
                        meses_labels=meses_labels,
                        meses_counts=meses_counts)
 

@@ -243,16 +243,17 @@
         </div>
       </div>
       <div class="col-md-3 mb-4">
-        <div class="card shadow">
-            <div class="card-header bg-success text-white fw-bold">Tipos de Equipos</div>
-            <div class="card-body chart-container" style="height:220px;">
-                <canvas id="chartEquipos"></canvas>
+            <div class="card shadow">
+                <div class="card-header bg-success text-white fw-bold">Tipos de Equipos</div>
+                <div class="card-body chart-container" style="height:220px;">
+                    <canvas id="chartEquipos"></canvas>
+                </div>
+                <div class="card-footer text-center fw-bold">
+                    Más común: {{ equipo_mas_comun }}
+                </div>
             </div>
-            <div class="card-footer text-center fw-bold">
-                Más común: {{ equipo_mas_comun }}
-            </div>
-        </div>
-        </div>
+       </div>
+
         <div class="col-md-3 mb-4">
             <div class="card shadow">
                 <div class="card-header bg-info text-white fw-bold">Marcas Más Comunes</div>
@@ -364,14 +365,14 @@ document.addEventListener('DOMContentLoaded', function() {
   new Chart(document.getElementById('chartMarcas'), {
     type: 'pie',
     data: {
-        labels: {{ equipo_labels|tojson }},
+        labels: {{ marca_labels|tojson }},
         datasets: [{
-            data: {{ equipo_counts|tojson }},
-            backgroundColor: ['#007bff', '#28a745', '#ffc107', '#dc3545', '#6f42c1', '#20c997']
+            data: {{ marca_counts|tojson }},
+            backgroundColor: ['#17a2b8', '#20c997', '#6f42c1', '#ffc107', '#dc3545', '#007bff']
         }]
     },
     options: { responsive: true }
-  });
+   });
 
   // === Ordenar tabla ===
   document.querySelectorAll("#tablaRegistros th").forEach(header => {
