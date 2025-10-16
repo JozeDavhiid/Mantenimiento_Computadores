@@ -240,7 +240,7 @@ def principal():
     if sede_filter and sede_filter != 'Todas':
         query += " AND sede = %s"
         params.append(sede_filter)
-    query += " ORDER BY fecha DESC LIMIT 10"
+    query += " ORDER BY id DESC LIMIT 10"
     c.execute(query, params)
     registros = c.fetchall()
 
