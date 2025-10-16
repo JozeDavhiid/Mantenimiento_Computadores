@@ -242,6 +242,13 @@ def principal():
     equipo_mas_comun = c.fetchone()
     equipo_mas_comun = equipo_mas_comun['tipo_equipo'] if equipo_mas_comun else 'N/A'
 
+    c.execute("""SELECT marca, COUNT(*) AS cantidad 
+                FROM mantenimiento 
+                GROUP BY marca 
+                ORDER BY cantidad DESC LIMIT 1""")
+    marca_mas_comun = c.fetchone()
+    marca_mas_comun = marca_mas_comun['marca'] if marca_mas_comun else 'N/A'
+
     c.execute("SELECT sede, COUNT(*) FROM mantenimiento GROUP BY sede ORDER BY sede")
     sedes_data = c.fetchall()
     sede_labels = [r['sede'] for r in sedes_data]
@@ -264,19 +271,20 @@ def principal():
     conn.close()
 
     return render_template('principal.html',
-                           registros=registros,
-                           nombre=session.get('nombre'),
-                           hoy=date.today().isoformat(),
-                           total_mantenimientos=total_mantenimientos,
-                           total_tecnicos=total_tecnicos,
-                           mantenimientos_mes=mantenimientos_mes,
-                           equipo_mas_comun=equipo_mas_comun,
-                           sede_labels=sede_labels,
-                           sede_counts=sede_counts,
-                           equipo_labels=equipo_labels,
-                           equipo_counts=equipo_counts,
-                           meses_labels=meses_labels,
-                           meses_counts=meses_counts)
+                       registros=registros,
+                       nombre=session.get('nombre'),
+                       hoy=date.today().isoformat(),
+                       total_mantenimientos=total_mantenimientos,
+                       total_tecnicos=total_tecnicos,
+                       mantenimientos_mes=mantenimientos_mes,
+                       equipo_mas_comun=equipo_mas_comun,
+                       marca_mas_comun=marca_mas_comun,
+                       sede_labels=sede_labels,
+                       sede_counts=sede_counts,
+                       equipo_labels=equipo_labels,
+                       equipo_counts=equipo_counts,
+                       meses_labels=meses_labels,
+                       meses_counts=meses_counts)
 
 
 @app.route('/obtener_registro/<int:rid>')

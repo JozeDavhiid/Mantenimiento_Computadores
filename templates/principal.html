@@ -242,14 +242,28 @@
           </div>
         </div>
       </div>
-      <div class="col-md-6 mb-4">
+      <div class="col-md-3 mb-4">
         <div class="card shadow">
-          <div class="card-header bg-success text-white fw-bold">Tipos de Equipos</div>
-          <div class="card-body chart-container">
-            <canvas id="chartEquipos"></canvas>
-          </div>
+            <div class="card-header bg-success text-white fw-bold">Tipos de Equipos</div>
+            <div class="card-body chart-container" style="height:220px;">
+                <canvas id="chartEquipos"></canvas>
+            </div>
+            <div class="card-footer text-center fw-bold">
+                Más común: {{ equipo_mas_comun }}
+            </div>
         </div>
-      </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="card shadow">
+                <div class="card-header bg-info text-white fw-bold">Marcas Más Comunes</div>
+                <div class="card-body chart-container" style="height:220px;">
+                    <canvas id="chartMarcas"></canvas>
+                </div>
+                <div class="card-footer text-center fw-bold">
+                    Más común: {{ marca_mas_comun }}
+                </div>
+            </div>
+        </div>
       <div class="col-md-12 mb-4">
         <div class="card shadow">
           <div class="card-header bg-warning text-white fw-bold">Tendencia Mensual</div>
