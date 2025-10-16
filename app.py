@@ -125,7 +125,7 @@ def consultar():
     total_pages = (total + per_page - 1) // per_page
 
     # Obtener registros paginados (ordenados por fecha más reciente)
-    query += " ORDER BY fecha DESC LIMIT %s OFFSET %s"
+    query += " ORDER BY fecha ASC LIMIT %s OFFSET %s"
     params += [per_page, offset]
     c.execute(query, params)
     registros = c.fetchall()
