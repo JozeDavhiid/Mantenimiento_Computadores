@@ -246,6 +246,7 @@ def principal():
     marcas_data = c.fetchall()
     marca_labels = [r['marca'] for r in marcas_data]
     marca_counts = [r['count'] for r in marcas_data]
+    marca_mas_comun = marcas_data[0]['marca'] if marcas_data else 'N/A'
 
     c.execute("SELECT sede, COUNT(*) FROM mantenimiento GROUP BY sede ORDER BY sede")
     sedes_data = c.fetchall()
