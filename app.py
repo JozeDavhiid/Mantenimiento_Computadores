@@ -85,6 +85,7 @@ def home():
         return redirect(url_for('principal'))
     return redirect(url_for('login'))
 
+
 @app.route('/consultar')
 def consultar():
     if 'usuario' not in session:
@@ -123,8 +124,8 @@ def consultar():
     total = c.fetchone()['count']
     total_pages = (total + per_page - 1) // per_page
 
-    # Obtener registros paginados
-    query += " ORDER BY id DESC LIMIT %s OFFSET %s"
+    # Obtener registros paginados (ordenados por fecha más reciente)
+    query += " ORDER BY fecha DESC LIMIT %s OFFSET %s"
     params += [per_page, offset]
     c.execute(query, params)
     registros = c.fetchall()
@@ -142,6 +143,7 @@ def consultar():
                            sedes=sedes,
                            page=page,
                            total_pages=total_pages)
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -199,23 +201,23 @@ def principal():
     # Insertar registro
     if request.method == 'POST' and request.form.get('action') == 'guardar':
         datos = (
-            request.form.get('sede',''),
+            request.form.get('sede', ''),
             request.form.get('fecha', date.today().isoformat()),
-            request.form.get('area',''),
-            session.get('nombre',''),
-            request.form.get('nombre_maquina','').upper(),
-            request.form.get('usuario_equipo',''),
-            request.form.get('tipo_equipo',''),
-            request.form.get('marca','').upper(),
-            request.form.get('modelo','').upper(),
-            request.form.get('serial','').upper(),
-            request.form.get('so',''),
-            request.form.get('office',''),
-            request.form.get('antivirus',''),
-            request.form.get('compresor',''),
-            request.form.get('control_remoto',''),
-            request.form.get('activo_fijo',''),
-            request.form.get('observaciones','')
+            request.form.get('area', ''),
+            session.get('nombre', ''),
+            request.form.get('nombre_maquina', '').upper(),
+            request.form.get('usuario_equipo', ''),
+            request.form.get('tipo_equipo', ''),
+            request.form.get('marca', '').upper(),
+            request.form.get('modelo', '').upper(),
+            request.form.get('serial', '').upper(),
+            request.form.get('so', ''),
+            request.form.get('office', ''),
+            request.form.get('antivirus', ''),
+            request.form.get('compresor', ''),
+            request.form.get('control_remoto', ''),
+            request.form.get('activo_fijo', ''),
+            request.form.get('observaciones', '')
         )
         c.execute('''INSERT INTO mantenimiento
                     (sede, fecha, area, tecnico, nombre_maquina, usuario, tipo_equipo, marca, modelo, serial,
@@ -225,8 +227,8 @@ def principal():
         flash('Registro guardado correctamente', 'success')
 
     # Búsqueda y filtros
-    search = request.args.get('q','').strip()
-    sede_filter = request.args.get('sede','Todas')
+    search = request.args.get('q', '').strip()
+    sede_filter = request.args.get('sede', 'Todas')
     query = "SELECT * FROM mantenimiento WHERE 1=1"
     params = []
     if search:
@@ -234,16 +236,16 @@ def principal():
         query += """ AND (sede ILIKE %s OR area ILIKE %s OR tecnico ILIKE %s OR nombre_maquina ILIKE %s 
                      OR usuario ILIKE %s OR tipo_equipo ILIKE %s OR marca ILIKE %s OR modelo ILIKE %s 
                      OR serial ILIKE %s OR observaciones ILIKE %s)"""
-        params += [like]*10
+        params += [like] * 10
     if sede_filter and sede_filter != 'Todas':
         query += " AND sede = %s"
         params.append(sede_filter)
-    query += " ORDER BY id DESC LIMIT 10"
+    query += " ORDER BY fecha DESC LIMIT 10"
     c.execute(query, params)
     registros = c.fetchall()
 
-    sedes = ["Todas","Nivel Central","Barranquilla","Soledad","Santa Marta","El Banco",
-             "Monteria","Sincelejo","Valledupar","El Carmen de Bolivar","Magangue"]
+    sedes = ["Todas", "Nivel Central", "Barranquilla", "Soledad", "Santa Marta", "El Banco",
+             "Monteria", "Sincelejo", "Valledupar", "El Carmen de Bolivar", "Magangue"]
 
     conn.close()
     return render_template('principal.html', registros=registros, sedes=sedes,
@@ -277,10 +279,10 @@ def actualizar_registro(rid):
     conn = get_db_connection()
     c = conn.cursor()
     campos = [
-        'sede','fecha','area','nombre_maquina','usuario_equipo','tipo_equipo','marca',
-        'modelo','serial','so','office','antivirus','compresor','control_remoto','activo_fijo','observaciones'
+        'sede', 'fecha', 'area', 'nombre_maquina', 'usuario_equipo', 'tipo_equipo', 'marca',
+        'modelo', 'serial', 'so', 'office', 'antivirus', 'compresor', 'control_remoto', 'activo_fijo', 'observaciones'
     ]
-    valores = [request.form.get(campo,'') for campo in campos]
+    valores = [request.form.get(campo, '') for campo in campos]
     c.execute('''UPDATE mantenimiento SET
                  sede=%s, fecha=%s, area=%s, nombre_maquina=%s, usuario=%s, tipo_equipo=%s, 
                  marca=%s, modelo=%s, serial=%s, sistema_operativo=%s, office=%s, antivirus=%s,
@@ -312,7 +314,7 @@ def exportar():
         return redirect(url_for('login'))
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM mantenimiento")
+    c.execute("SELECT * FROM mantenimiento ORDER BY fecha DESC")
     registros = c.fetchall()
     conn.close()
 
@@ -381,5 +383,3 @@ def acta_pdf(rid):
 # -----------------------
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
-
-#Proyecto de Mantenimiento
