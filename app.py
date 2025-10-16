@@ -382,6 +382,35 @@ def obtener_registro(rid):
         return redirect(url_for('principal'))
 
     return render_template('editar.html', registro=registro)
+
+    @app.route('/actualizar/<int:rid>', methods=['POST'])
+    
+def actualizar_registro(rid):
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    campos = [
+        'sede', 'fecha', 'area', 'nombre_maquina', 'usuario_equipo', 'tipo_equipo',
+        'marca', 'modelo', 'serial', 'so', 'office', 'antivirus',
+        'compresor', 'control_remoto', 'activo_fijo', 'observaciones'
+    ]
+    valores = [request.form.get(campo, '') for campo in campos]
+
+    c.execute('''UPDATE mantenimiento SET
+                 sede=%s, fecha=%s, area=%s, nombre_maquina=%s, usuario=%s, tipo_equipo=%s, 
+                 marca=%s, modelo=%s, serial=%s, sistema_operativo=%s, office=%s, antivirus=%s,
+                 compresor=%s, control_remoto=%s, activo_fijo=%s, observaciones=%s
+                 WHERE id=%s''', (*valores, rid))
+    
+    conn.commit()
+    conn.close()
+
+    flash('Registro actualizado correctamente', 'success')
+    return redirect(url_for('principal'))
+
 # -----------------------
 # Main
 # -----------------------
