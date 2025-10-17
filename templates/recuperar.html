@@ -34,24 +34,10 @@
       {% endif %}
     {% endwith %}
 
-    <form method="POST">
-      <div class="mb-3">
-        <label class="form-label fw-bold">Usuario</label>
-        <input type="text" name="usuario" class="form-control" required>
-      </div>
-      <div class="mb-3">
-        <label class="form-label fw-bold">Nueva Contraseña</label>
-        <input type="password" name="nueva_contrasena" class="form-control" required>
-      </div>
-      <div class="mb-3">
-        <label class="form-label fw-bold">Confirmar Contraseña</label>
-        <input type="password" name="confirmar" class="form-control" required>
-      </div>
-
-      <div class="d-grid gap-2">
-        <button type="submit" class="btn btn-primary">Actualizar Contraseña</button>
-        <a href="{{ url_for('login') }}" class="btn btn-secondary">⬅️ Volver al Login</a>
-      </div>
+   <form method="POST">
+      <label for="correo">Correo electrónico</label>
+      <input type="email" name="correo" required class="form-control" placeholder="Ingresa tu correo">
+      <button type="submit" class="btn btn-primary mt-3">Recuperar contraseña</button>
     </form>
   </div>
 

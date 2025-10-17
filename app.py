@@ -9,6 +9,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import re
 from functools import wraps
+from flask_mail import Mail, Message
 
 # -----------------------
 # Configuración
@@ -233,29 +234,41 @@ def registro():
 @app.route('/recuperar', methods=['GET', 'POST'])
 def recuperar():
     if request.method == 'POST':
-        usuario = request.form['usuario'].strip()
-        nueva_contrasena = request.form['nueva_contrasena'].strip()
-        confirmar = request.form['confirmar'].strip()
-
-        if nueva_contrasena != confirmar:
-            flash('Las contraseñas no coinciden', 'warning')
-            return redirect(url_for('recuperar'))
+        correo = request.form['correo'].strip()
 
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT * FROM tecnicos WHERE usuario=%s", (usuario,))
+        c.execute("SELECT * FROM tecnicos WHERE correo=%s", (correo,))
         user = c.fetchone()
+        conn.close()
 
         if not user:
-            flash('El usuario no existe', 'danger')
-            conn.close()
+            flash('❌ No existe un usuario con ese correo electrónico', 'danger')
             return redirect(url_for('recuperar'))
 
-        c.execute("UPDATE tecnicos SET contrasena=%s WHERE usuario=%s", (nueva_contrasena, usuario))
+        # Generar una nueva contraseña temporal
+        nueva_contrasena = os.urandom(4).hex()
+        contrasena_hash = generate_password_hash(nueva_contrasena)
+
+        # Actualizar en la base de datos
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("UPDATE tecnicos SET contrasena=%s WHERE correo=%s", (contrasena_hash, correo))
         conn.commit()
         conn.close()
 
-        flash('Contraseña actualizada correctamente ✅', 'success')
+        # Enviar correo
+        try:
+            msg = Message(
+                subject="🔐 Recuperación de contraseña - Sistema de Mantenimiento",
+                recipients=[correo],
+                body=f"Hola {user['nombre']},\n\nTu nueva contraseña temporal es: {nueva_contrasena}\n\nPor favor cámbiala después de iniciar sesión.\n\nAtentamente,\nSoporte de Mantenimiento"
+            )
+            mail.send(msg)
+            flash('✅ Se ha enviado una nueva contraseña a tu correo electrónico.', 'success')
+        except Exception as e:
+            flash(f'⚠️ Error al enviar el correo: {e}', 'danger')
+
         return redirect(url_for('login'))
 
     return render_template('recuperar.html')
@@ -485,6 +498,18 @@ def acta_pdf(rid):
     return send_file(buffer, as_attachment=True,
                      download_name=f"Acta_Registro_{registro['id']}.pdf",
                      mimetype='application/pdf')
+
+# -----------------------
+# Configuración de correo
+# -----------------------
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True') == 'True'
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')
+
+mail = Mail(app)
 
 # -----------------------
 # Main
