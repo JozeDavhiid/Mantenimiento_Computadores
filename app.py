@@ -4,7 +4,6 @@ import secrets
 import smtplib
 from datetime import datetime, timedelta
 from email.message import EmailMessage
-
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -23,6 +22,7 @@ if not DB_URL:
     raise ValueError("Debes configurar DATABASE_URL como variable de entorno con la URL de PostgreSQL de Render")
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'clave_secreta_local')
+
 # SMTP settings
 SMTP_HOST = os.environ.get('SMTP_HOST')       # e.g. "smtp.gmail.com"
 SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
@@ -41,7 +41,7 @@ def get_db_connection():
     return conn
 
 # -----------------------
-# Inicializar DB (asegura columnas/tabla reset)
+# Inicializar DB
 # -----------------------
 def init_db():
     conn = get_db_connection()
@@ -67,7 +67,7 @@ def init_db():
                     activo_fijo TEXT,
                     observaciones TEXT
                 )''')
-    # Tabla tecnicos (añadimos columna correo si no existe y rol)
+    # Tabla tecnicos
     c.execute('''CREATE TABLE IF NOT EXISTS tecnicos (
                     id SERIAL PRIMARY KEY,
                     usuario TEXT UNIQUE,
@@ -83,10 +83,9 @@ def init_db():
                     token TEXT UNIQUE,
                     expires_at TIMESTAMP
                 )''')
-    # Usuario admin por defecto (si no existe)
+    # Usuario admin por defecto
     c.execute("SELECT * FROM tecnicos WHERE usuario='admin'")
     if not c.fetchone():
-        # contraseña en texto plano por compatibilidad (puedes cambiarla luego)
         c.execute("INSERT INTO tecnicos (usuario, nombre, correo, contrasena, rol) VALUES (%s,%s,%s,%s,%s)",
                   ('admin', 'Administrador', 'admin@example.com', '1234', 'admin'))
     conn.commit()
@@ -96,7 +95,7 @@ with app.app_context():
     init_db()
 
 # -----------------------
-# Decoradores utilitarios
+# Decoradores
 # -----------------------
 def login_required(f):
     @wraps(f)
@@ -117,12 +116,11 @@ def admin_required(f):
     return decorated
 
 # -----------------------
-# Util: enviar correo (SMTP)
+# Función enviar correo
 # -----------------------
 def send_email(to_email: str, subject: str, body: str):
     if not SMTP_HOST or not SMTP_USER or not SMTP_PASS:
-        app.logger.warning("Intentando enviar correo pero faltan variables SMTP (SMTP_HOST/SMTP_USER/SMTP_PASS).")
-        raise RuntimeError("SMTP no configurado")
+        raise RuntimeError("SMTP no configurado correctamente")
     msg = EmailMessage()
     msg['From'] = SMTP_FROM
     msg['To'] = to_email
@@ -151,18 +149,15 @@ def login():
     if request.method == 'POST':
         usuario = request.form['usuario'].strip()
         contrasena = request.form['contrasena'].strip()
-
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("SELECT usuario, nombre, correo, contrasena, rol FROM tecnicos WHERE usuario=%s", (usuario,))
         row = c.fetchone()
         conn.close()
-
-        # COMPARACIÓN EN TEXTO PLANO (según petición)
         if row and row['contrasena'] == contrasena:
             session['usuario'] = row['usuario']
             session['nombre'] = row['nombre']
-            session['rol'] = row.get('rol', 'tecnico') if isinstance(row, dict) else 'tecnico'
+            session['rol'] = row.get('rol', 'tecnico')
             flash(f'Bienvenido {row["nombre"]}', 'success')
             return redirect(url_for('principal'))
         flash('Usuario o contraseña incorrectos', 'danger')
@@ -176,17 +171,13 @@ def registro():
         nombre = request.form['nombre'].strip()
         correo = request.form['correo'].strip()
         contrasena = request.form['contrasena'].strip()
-
-        # validaciones
         if not usuario or not nombre or not correo or not contrasena:
             flash('Complete todos los campos', 'warning')
             return redirect(url_for('registro'))
-
         patron_correo = r'^[^@]+@[^@]+\.[^@]+$'
         if not re.match(patron_correo, correo):
             flash('Formato de correo inválido', 'warning')
             return redirect(url_for('registro'))
-
         conn = get_db_connection()
         c = conn.cursor()
         try:
@@ -209,10 +200,7 @@ def logout():
     return redirect(url_for('login'))
 
 # -----------------------
-# Recuperación por correo (flujo)
-# 1) POST a /recuperar con usuario -> crea token, guarda en password_resets, envía mail con link
-# 2) GET /recuperar/confirm?token=... -> formulario para nueva contraseña
-# 3) POST /recuperar/confirm -> valida token, actualiza contraseña (texto plano), borra token
+# Recuperación por correo
 # -----------------------
 @app.route('/recuperar', methods=['GET', 'POST'])
 def recuperar():
@@ -221,7 +209,6 @@ def recuperar():
         if not usuario:
             flash('Ingresa tu usuario', 'warning')
             return redirect(url_for('recuperar'))
-
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("SELECT correo FROM tecnicos WHERE usuario=%s", (usuario,))
@@ -230,22 +217,15 @@ def recuperar():
             conn.close()
             flash('Usuario no encontrado', 'danger')
             return redirect(url_for('recuperar'))
-
         correo = row['correo']
-        # generar token y expiración (1 hora)
         token = secrets.token_urlsafe(32)
         expires_at = datetime.utcnow() + timedelta(hours=1)
-        # guardar token
         c.execute("INSERT INTO password_resets (usuario, token, expires_at) VALUES (%s,%s,%s)",
                   (usuario, token, expires_at))
         conn.commit()
         conn.close()
-
-        # construir enlace
         base = request.host_url.rstrip('/')
         link = f"{base}{url_for('recuperar_confirm')}?token={token}"
-
-        # enviar correo
         subject = "Recuperación de contraseña - Mantenimiento"
         body = f"""Hola {usuario},
 
@@ -266,9 +246,7 @@ Admin - Sistema de Mantenimiento
             app.logger.exception("Error enviando correo de recuperación")
             flash('No se pudo enviar el correo. Consulta la configuración SMTP.', 'danger')
         return redirect(url_for('login'))
-
     return render_template('recuperar.html')
-
 
 @app.route('/recuperar/confirm', methods=['GET', 'POST'])
 def recuperar_confirm():
@@ -276,7 +254,6 @@ def recuperar_confirm():
     if not token:
         flash('Token inválido', 'danger')
         return redirect(url_for('recuperar'))
-
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT usuario, expires_at FROM password_resets WHERE token=%s", (token,))
@@ -285,22 +262,13 @@ def recuperar_confirm():
         conn.close()
         flash('Token inválido o ya usado', 'danger')
         return redirect(url_for('recuperar'))
-
     expires_at = row['expires_at']
-    if isinstance(expires_at, str):
-        # por si se guardó como texto
-        expires_at_dt = datetime.fromisoformat(expires_at)
-    else:
-        expires_at_dt = expires_at
-
-    if datetime.utcnow() > expires_at_dt:
-        # token expirado: eliminar y pedir reintento
+    if datetime.utcnow() > expires_at:
         c.execute("DELETE FROM password_resets WHERE token=%s", (token,))
         conn.commit()
         conn.close()
         flash('Token expirado. Solicita recuperar de nuevo.', 'warning')
         return redirect(url_for('recuperar'))
-
     if request.method == 'POST':
         nueva = request.form['nueva_contrasena'].strip()
         confirmar = request.form['confirmar_contrasena'].strip()
@@ -310,18 +278,13 @@ def recuperar_confirm():
         if nueva != confirmar:
             flash('Las contraseñas no coinciden', 'warning')
             return redirect(url_for('recuperar_confirm') + f"?token={token}")
-
         usuario = row['usuario']
-        # actualizar contraseña en texto plano (según petición)
         c.execute("UPDATE tecnicos SET contrasena=%s WHERE usuario=%s", (nueva, usuario))
-        # eliminar token
         c.execute("DELETE FROM password_resets WHERE token=%s", (token,))
         conn.commit()
         conn.close()
         flash('Contraseña actualizada correctamente ✅', 'success')
         return redirect(url_for('login'))
-
-    # GET -> mostrar formulario
     conn.close()
     return render_template('recuperar_confirm.html', token=token)
 
