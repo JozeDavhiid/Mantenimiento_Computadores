@@ -212,6 +212,38 @@ def registro():
             conn.close()
     return render_template('registro.html')
 
+# -----------------------
+# Recuperar contraseña (manual)
+# -----------------------
+@app.route('/recuperar', methods=['GET', 'POST'])
+def recuperar():
+    if request.method == 'POST':
+        usuario = request.form['usuario'].strip()
+        nueva_contrasena = request.form['nueva_contrasena'].strip()
+        confirmar = request.form['confirmar'].strip()
+
+        if nueva_contrasena != confirmar:
+            flash('Las contraseñas no coinciden', 'warning')
+            return redirect(url_for('recuperar'))
+
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT * FROM tecnicos WHERE usuario=%s", (usuario,))
+        user = c.fetchone()
+
+        if not user:
+            flash('El usuario no existe', 'danger')
+            conn.close()
+            return redirect(url_for('recuperar'))
+
+        c.execute("UPDATE tecnicos SET contrasena=%s WHERE usuario=%s", (nueva_contrasena, usuario))
+        conn.commit()
+        conn.close()
+
+        flash('Contraseña actualizada correctamente ✅', 'success')
+        return redirect(url_for('login'))
+
+    return render_template('recuperar.html')
 
 @app.route('/logout')
 def logout():
