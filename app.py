@@ -7,6 +7,7 @@ from io import BytesIO
 from datetime import date
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+import re
 from functools import wraps
 
 # -----------------------
@@ -189,25 +190,39 @@ def login():
         flash('Usuario o contraseña incorrectos', 'danger')
     return render_template('login.html')
 
-
 @app.route('/registro', methods=['GET', 'POST'])
 @admin_required
 def registro():
     if request.method == 'POST':
         usuario = request.form['usuario'].strip()
         nombre = request.form['nombre'].strip()
+        correo = request.form['correo'].strip()
         contrasena = request.form['contrasena'].strip()
-        rol = request.form.get('rol', 'tecnico').strip()
+
+        # Verificar campos vacíos
+        if not usuario or not nombre or not correo or not contrasena:
+            flash('Complete todos los campos', 'warning')
+            return redirect(url_for('registro'))
+
+        # Validar formato de correo
+        patron_correo = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(patron_correo, correo):
+            flash('El correo electrónico no tiene un formato válido.', 'danger')
+            return redirect(url_for('registro'))
+
         conn = get_db_connection()
         c = conn.cursor()
         try:
-            c.execute("INSERT INTO tecnicos (usuario, nombre, contrasena, rol) VALUES (%s, %s, %s, %s)",
-                      (usuario, nombre, contrasena, rol))
+            c.execute("""
+                INSERT INTO tecnicos (usuario, nombre, correo, contrasena)
+                VALUES (%s, %s, %s, %s)
+            """, (usuario, nombre, correo, contrasena))
             conn.commit()
-            flash('Técnico registrado correctamente', 'success')
-            return redirect(url_for('principal'))
+            flash('✅ Técnico registrado correctamente', 'success')
+            return redirect(url_for('login'))
         except psycopg2.IntegrityError:
-            flash('El usuario ya existe', 'warning')
+            conn.rollback()
+            flash('⚠️ El usuario o correo ya existe.', 'warning')
         finally:
             conn.close()
     return render_template('registro.html')
