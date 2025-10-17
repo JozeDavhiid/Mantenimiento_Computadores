@@ -471,11 +471,6 @@ def acta_pdf(rid):
                      download_name=f"Acta_Registro_{registro['id']}.pdf",
                      mimetype='application/pdf')
 
-
-@app.route('/recuperar')
-def recuperar():
-    return "<h3>Página de recuperación de contraseña en construcción 🛠️</h3>"
-
 # -----------------------
 # Main
 # -----------------------
