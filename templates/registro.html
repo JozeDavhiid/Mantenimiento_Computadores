@@ -1,47 +1,92 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Registro - Mantenimiento</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="UTF-8">
+  <title>Registrar Técnico</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f8f9fa;
+    }
+    .card {
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    .btn-custom {
+      min-width: 140px;
+    }
+  </style>
 </head>
-<body class="bg-light">
+<body>
 
-<div class="container d-flex justify-content-center align-items-center" style="min-height: 100vh;">
-    <div class="card shadow p-4" style="width: 400px;">
-        <h3 class="card-title text-center mb-3">Registro de Técnico</h3>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-              </div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
-
-        <form method="POST">
-            <div class="mb-3">
-                <label for="usuario" class="form-label">Usuario</label>
-                <input type="text" class="form-control" id="usuario" name="usuario" required>
-            </div>
-            <div class="mb-3">
-                <label for="nombre" class="form-label">Nombre Completo</label>
-                <input type="text" class="form-control" id="nombre" name="nombre" required>
-            </div>
-            <div class="mb-3">
-                <label for="contrasena" class="form-label">Contraseña</label>
-                <input type="password" class="form-control" id="contrasena" name="contrasena" required>
-            </div>
-            <button type="submit" class="btn btn-success w-100">Registrarse</button>
-        </form>
-
-        <div class="mt-3 text-center">
-            <a href="{{ url_for('login') }}">¿Ya tienes cuenta? Inicia sesión</a>
-        </div>
+<!-- ===================== -->
+<!-- NAVBAR -->
+<!-- ===================== -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="{{ url_for('principal') }}">🖥️ Mantenimiento</a>
+    <div class="d-flex">
+      <span class="navbar-text text-white me-3">👋 {{ session.get('nombre') }}</span>
+      <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">Cerrar sesión</a>
     </div>
+  </div>
+</nav>
+
+<div class="container-fluid py-4">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="card mx-auto col-lg-6 col-md-8 col-sm-12 p-4">
+    <h2 class="text-center mb-4 fw-bold">Registrar Nuevo Técnico</h2>
+
+    {% if session.get('rol') == 'admin' %}
+    <form action="{{ url_for('registro') }}" method="POST" class="row g-3">
+
+      <div class="col-12">
+        <label class="form-label fw-bold">Usuario</label>
+        <input type="text" name="usuario" class="form-control" required>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label fw-bold">Nombre Completo</label>
+        <input type="text" name="nombre" class="form-control" required>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label fw-bold">Contraseña</label>
+        <input type="password" name="contrasena" class="form-control" required>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label fw-bold">Rol</label>
+        <select name="rol" class="form-select">
+          <option value="tecnico" selected>Técnico</option>
+          <option value="admin">Administrador</option>
+        </select>
+      </div>
+
+      <div class="col-12 text-center mt-4">
+        <button type="submit" class="btn btn-success btn-custom me-3 shadow-sm">💾 Registrar</button>
+        <a href="{{ url_for('principal') }}" class="btn btn-outline-dark btn-custom shadow-sm">⬅️ Volver</a>
+      </div>
+    </form>
+    {% else %}
+      <div class="alert alert-danger text-center fw-bold" role="alert">
+        🚫 No tienes permisos para acceder a esta sección.
+      </div>
+      <div class="text-center mt-3">
+        <a href="{{ url_for('principal') }}" class="btn btn-secondary">Volver al Panel</a>
+      </div>
+    {% endif %}
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

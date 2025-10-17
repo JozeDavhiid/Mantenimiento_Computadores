@@ -7,14 +7,31 @@
   <style>
     body {
       background-color: #f8f9fa;
+      font-family: 'Segoe UI', sans-serif;
     }
     .table thead th {
       cursor: pointer;
       transition: background 0.2s;
+      text-align: center;
     }
     .table thead th:hover {
       background-color: #0d6efd !important;
       color: white;
+    }
+    .table td {
+      vertical-align: middle;
+    }
+    .card {
+      border-radius: 12px;
+      border: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    .card-header {
+      border-top-left-radius: 12px;
+      border-top-right-radius: 12px;
+    }
+    .btn {
+      border-radius: 8px;
     }
   </style>
 </head>
@@ -35,7 +52,7 @@
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
           {{ message }}
           <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
@@ -76,8 +93,8 @@
         </div>
 
         <div class="col-md-3 d-flex gap-2">
-          <button type="submit" class="btn btn-success flex-fill">Filtrar</button>
-          <a href="{{ url_for('consultar') }}" class="btn btn-outline-secondary flex-fill">Limpiar</a>
+          <button type="submit" class="btn btn-success flex-fill fw-bold">Filtrar</button>
+          <a href="{{ url_for('consultar') }}" class="btn btn-outline-secondary flex-fill fw-bold">Limpiar</a>
         </div>
       </form>
     </div>
@@ -118,15 +135,18 @@
               <td>{{ r.usuario }}</td>
               <td>{{ r.marca }}</td>
               <td>
-              <div class="d-flex gap-2">
-                    <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-warning btn-sm">Editar</a>
-                    <a href="{{ url_for('acta_pdf', rid=r.id) }}" class="btn btn-success btn-sm">Acta</a>
-                    <form action="{{ url_for('eliminar', rid=r.id) }}" method="POST" 
+                <div class="d-flex gap-2 justify-content-center">
+                  <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-warning btn-sm">Editar</a>
+                  <a href="{{ url_for('acta_pdf', rid=r.id) }}" class="btn btn-success btn-sm">Acta</a>
+
+                  {% if session['rol'] == 'admin' %}
+                  <form action="{{ url_for('eliminar', rid=r.id) }}" method="POST"
                         onsubmit="return confirm('¿Seguro que deseas eliminar este registro?');" class="m-0 p-0">
-                        <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
-                    </form>
+                    <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+                  </form>
+                  {% endif %}
                 </div>
-            </td>
+              </td>
             </tr>
             {% endfor %}
           </tbody>
