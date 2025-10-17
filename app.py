@@ -1,4 +1,10 @@
 import os
+import re
+import secrets
+import smtplib
+from datetime import datetime, timedelta
+from email.message import EmailMessage
+
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -7,22 +13,25 @@ from io import BytesIO
 from datetime import date
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
-import re
 from functools import wraps
-from flask_mail import Mail, Message
 
 # -----------------------
-# Configuración
+# Configuración / SMTP desde variables de entorno
 # -----------------------
 DB_URL = os.environ.get('DATABASE_URL')
 if not DB_URL:
     raise ValueError("Debes configurar DATABASE_URL como variable de entorno con la URL de PostgreSQL de Render")
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'clave_secreta_local')
+# SMTP settings
+SMTP_HOST = os.environ.get('SMTP_HOST')       # e.g. "smtp.gmail.com"
+SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
+SMTP_USER = os.environ.get('SMTP_USER')       # tu usuario SMTP (email)
+SMTP_PASS = os.environ.get('SMTP_PASS')       # password o app password
+SMTP_FROM = os.environ.get('SMTP_FROM', SMTP_USER)
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
-
 
 # -----------------------
 # Función conexión DB
@@ -31,9 +40,8 @@ def get_db_connection():
     conn = psycopg2.connect(DB_URL, cursor_factory=RealDictCursor)
     return conn
 
-
 # -----------------------
-# Inicializar DB (asegura roles)
+# Inicializar DB (asegura columnas/tabla reset)
 # -----------------------
 def init_db():
     conn = get_db_connection()
@@ -59,36 +67,36 @@ def init_db():
                     activo_fijo TEXT,
                     observaciones TEXT
                 )''')
-    # Tabla tecnicos
+    # Tabla tecnicos (añadimos columna correo si no existe y rol)
     c.execute('''CREATE TABLE IF NOT EXISTS tecnicos (
                     id SERIAL PRIMARY KEY,
                     usuario TEXT UNIQUE,
                     nombre TEXT,
+                    correo TEXT UNIQUE,
                     contrasena TEXT,
                     rol TEXT DEFAULT 'tecnico'
                 )''')
-
-    # Si no existe la columna 'rol' (por versiones viejas), la agregamos
-    c.execute("SELECT column_name FROM information_schema.columns WHERE table_name='tecnicos'")
-    columnas = [r['column_name'] for r in c.fetchall()]
-    if 'rol' not in columnas:
-        c.execute("ALTER TABLE tecnicos ADD COLUMN rol TEXT DEFAULT 'tecnico'")
-
-    # Usuario admin por defecto
+    # tabla para tokens de recuperación
+    c.execute('''CREATE TABLE IF NOT EXISTS password_resets (
+                    id SERIAL PRIMARY KEY,
+                    usuario TEXT,
+                    token TEXT UNIQUE,
+                    expires_at TIMESTAMP
+                )''')
+    # Usuario admin por defecto (si no existe)
     c.execute("SELECT * FROM tecnicos WHERE usuario='admin'")
     if not c.fetchone():
-        c.execute("INSERT INTO tecnicos (usuario, nombre, contrasena, rol) VALUES (%s, %s, %s, %s)",
-                  ('admin', 'Administrador', '1234', 'admin'))
+        # contraseña en texto plano por compatibilidad (puedes cambiarla luego)
+        c.execute("INSERT INTO tecnicos (usuario, nombre, correo, contrasena, rol) VALUES (%s,%s,%s,%s,%s)",
+                  ('admin', 'Administrador', 'admin@example.com', '1234', 'admin'))
     conn.commit()
     conn.close()
-
 
 with app.app_context():
     init_db()
 
-
 # -----------------------
-# Decoradores de autenticación
+# Decoradores utilitarios
 # -----------------------
 def login_required(f):
     @wraps(f)
@@ -99,16 +107,35 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
-
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if session.get('rol') != 'admin':
-            flash('Acceso denegado: solo administradores pueden realizar esta acción', 'danger')
-            return redirect(url_for('principal'))
+        if 'usuario' not in session or session.get('rol') != 'admin':
+            flash('Acceso denegado: solo administradores', 'danger')
+            return redirect(url_for('principal') if 'usuario' in session else url_for('login'))
         return f(*args, **kwargs)
     return decorated
 
+# -----------------------
+# Util: enviar correo (SMTP)
+# -----------------------
+def send_email(to_email: str, subject: str, body: str):
+    if not SMTP_HOST or not SMTP_USER or not SMTP_PASS:
+        app.logger.warning("Intentando enviar correo pero faltan variables SMTP (SMTP_HOST/SMTP_USER/SMTP_PASS).")
+        raise RuntimeError("SMTP no configurado")
+    msg = EmailMessage()
+    msg['From'] = SMTP_FROM
+    msg['To'] = to_email
+    msg['Subject'] = subject
+    msg.set_content(body)
+
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as smtp:
+        smtp.ehlo()
+        if SMTP_PORT in (587, 25):
+            smtp.starttls()
+            smtp.ehlo()
+        smtp.login(SMTP_USER, SMTP_PASS)
+        smtp.send_message(msg)
 
 # -----------------------
 # Rutas principales
@@ -119,74 +146,24 @@ def home():
         return redirect(url_for('principal'))
     return redirect(url_for('login'))
 
-
-@app.route('/consultar_registro')
-@login_required
-def consultar():
-    search = request.args.get('q', '').strip()
-    sede_filter = request.args.get('sede', 'Todas')
-    page = int(request.args.get('page', 1))
-    per_page = 20
-    offset = (page - 1) * per_page
-
-    conn = get_db_connection()
-    c = conn.cursor()
-
-    query = "SELECT * FROM mantenimiento WHERE 1=1"
-    params = []
-
-    if search:
-        like = f"%{search}%"
-        query += """ AND (
-            sede ILIKE %s OR area ILIKE %s OR tecnico ILIKE %s OR nombre_maquina ILIKE %s OR
-            usuario ILIKE %s OR tipo_equipo ILIKE %s OR marca ILIKE %s OR modelo ILIKE %s OR
-            serial ILIKE %s OR observaciones ILIKE %s
-        )"""
-        params += [like] * 10
-
-    if sede_filter and sede_filter != 'Todas':
-        query += " AND sede = %s"
-        params.append(sede_filter)
-
-    count_query = f"SELECT COUNT(*) FROM ({query}) AS subquery"
-    c.execute(count_query, params)
-    total = c.fetchone()['count']
-    total_pages = (total + per_page - 1) // per_page
-
-    query += " ORDER BY fecha ASC LIMIT %s OFFSET %s"
-    params += [per_page, offset]
-    c.execute(query, params)
-    registros = c.fetchall()
-    conn.close()
-
-    sedes = ["Todas", "Nivel Central", "Barranquilla", "Soledad", "Santa Marta",
-             "El Banco", "Monteria", "Sincelejo", "Valledupar",
-             "El Carmen de Bolivar", "Magangue"]
-
-    return render_template('consultar.html',
-                           registros=registros,
-                           search=search,
-                           sede_filter=sede_filter,
-                           sedes=sedes,
-                           page=page,
-                           total_pages=total_pages)
-
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         usuario = request.form['usuario'].strip()
         contrasena = request.form['contrasena'].strip()
+
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT nombre, rol FROM tecnicos WHERE usuario=%s AND contrasena=%s", (usuario, contrasena))
+        c.execute("SELECT usuario, nombre, correo, contrasena, rol FROM tecnicos WHERE usuario=%s", (usuario,))
         row = c.fetchone()
         conn.close()
-        if row:
-            session['usuario'] = usuario
+
+        # COMPARACIÓN EN TEXTO PLANO (según petición)
+        if row and row['contrasena'] == contrasena:
+            session['usuario'] = row['usuario']
             session['nombre'] = row['nombre']
-            session['rol'] = row['rol']
-            flash(f'Bienvenido {row["nombre"]} ({row["rol"]})', 'success')
+            session['rol'] = row.get('rol', 'tecnico') if isinstance(row, dict) else 'tecnico'
+            flash(f'Bienvenido {row["nombre"]}', 'success')
             return redirect(url_for('principal'))
         flash('Usuario o contraseña incorrectos', 'danger')
     return render_template('login.html')
@@ -200,85 +177,157 @@ def registro():
         correo = request.form['correo'].strip()
         contrasena = request.form['contrasena'].strip()
 
-        # Verificar campos vacíos
+        # validaciones
         if not usuario or not nombre or not correo or not contrasena:
             flash('Complete todos los campos', 'warning')
             return redirect(url_for('registro'))
 
-        # Validar formato de correo
-        patron_correo = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        patron_correo = r'^[^@]+@[^@]+\.[^@]+$'
         if not re.match(patron_correo, correo):
-            flash('El correo electrónico no tiene un formato válido.', 'danger')
+            flash('Formato de correo inválido', 'warning')
             return redirect(url_for('registro'))
 
         conn = get_db_connection()
         c = conn.cursor()
         try:
-            c.execute("""
-                INSERT INTO tecnicos (usuario, nombre, correo, contrasena)
-                VALUES (%s, %s, %s, %s)
-            """, (usuario, nombre, correo, contrasena))
+            c.execute("""INSERT INTO tecnicos (usuario, nombre, correo, contrasena)
+                         VALUES (%s, %s, %s, %s)""",
+                      (usuario, nombre, correo, contrasena))
             conn.commit()
-            flash('✅ Técnico registrado correctamente', 'success')
-            return redirect(url_for('login'))
+            flash('Técnico registrado correctamente', 'success')
+            return redirect(url_for('principal'))
         except psycopg2.IntegrityError:
             conn.rollback()
-            flash('⚠️ El usuario o correo ya existe.', 'warning')
+            flash('El usuario o correo ya existe', 'warning')
         finally:
             conn.close()
     return render_template('registro.html')
-
-# -----------------------
-# Recuperar contraseña (manual)
-# -----------------------
-@app.route('/recuperar', methods=['GET', 'POST'])
-def recuperar():
-    if request.method == 'POST':
-        correo = request.form['correo'].strip()
-
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT * FROM tecnicos WHERE correo=%s", (correo,))
-        user = c.fetchone()
-        conn.close()
-
-        if not user:
-            flash('❌ No existe un usuario con ese correo electrónico', 'danger')
-            return redirect(url_for('recuperar'))
-
-        # Generar una nueva contraseña temporal
-        nueva_contrasena = os.urandom(4).hex()
-        contrasena_hash = generate_password_hash(nueva_contrasena)
-
-        # Actualizar en la base de datos
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("UPDATE tecnicos SET contrasena=%s WHERE correo=%s", (contrasena_hash, correo))
-        conn.commit()
-        conn.close()
-
-        # Enviar correo
-        try:
-            msg = Message(
-                subject="🔐 Recuperación de contraseña - Sistema de Mantenimiento",
-                recipients=[correo],
-                body=f"Hola {user['nombre']},\n\nTu nueva contraseña temporal es: {nueva_contrasena}\n\nPor favor cámbiala después de iniciar sesión.\n\nAtentamente,\nSoporte de Mantenimiento"
-            )
-            mail.send(msg)
-            flash('✅ Se ha enviado una nueva contraseña a tu correo electrónico.', 'success')
-        except Exception as e:
-            flash(f'⚠️ Error al enviar el correo: {e}', 'danger')
-
-        return redirect(url_for('login'))
-
-    return render_template('recuperar.html')
 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
 
+# -----------------------
+# Recuperación por correo (flujo)
+# 1) POST a /recuperar con usuario -> crea token, guarda en password_resets, envía mail con link
+# 2) GET /recuperar/confirm?token=... -> formulario para nueva contraseña
+# 3) POST /recuperar/confirm -> valida token, actualiza contraseña (texto plano), borra token
+# -----------------------
+@app.route('/recuperar', methods=['GET', 'POST'])
+def recuperar():
+    if request.method == 'POST':
+        usuario = request.form['usuario'].strip()
+        if not usuario:
+            flash('Ingresa tu usuario', 'warning')
+            return redirect(url_for('recuperar'))
 
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT correo FROM tecnicos WHERE usuario=%s", (usuario,))
+        row = c.fetchone()
+        if not row:
+            conn.close()
+            flash('Usuario no encontrado', 'danger')
+            return redirect(url_for('recuperar'))
+
+        correo = row['correo']
+        # generar token y expiración (1 hora)
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(hours=1)
+        # guardar token
+        c.execute("INSERT INTO password_resets (usuario, token, expires_at) VALUES (%s,%s,%s)",
+                  (usuario, token, expires_at))
+        conn.commit()
+        conn.close()
+
+        # construir enlace
+        base = request.host_url.rstrip('/')
+        link = f"{base}{url_for('recuperar_confirm')}?token={token}"
+
+        # enviar correo
+        subject = "Recuperación de contraseña - Mantenimiento"
+        body = f"""Hola {usuario},
+
+Se solicitó restablecer la contraseña de tu cuenta. Haz clic en el enlace a continuación para crear una nueva contraseña.
+El enlace expira en 1 hora.
+
+{link}
+
+Si no solicitaste este cambio, ignora este correo.
+
+Saludos,
+Admin - Sistema de Mantenimiento
+"""
+        try:
+            send_email(correo, subject, body)
+            flash('Se ha enviado un correo con las instrucciones. Revisa tu bandeja.', 'info')
+        except Exception as e:
+            app.logger.exception("Error enviando correo de recuperación")
+            flash('No se pudo enviar el correo. Consulta la configuración SMTP.', 'danger')
+        return redirect(url_for('login'))
+
+    return render_template('recuperar.html')
+
+
+@app.route('/recuperar/confirm', methods=['GET', 'POST'])
+def recuperar_confirm():
+    token = request.args.get('token') or request.form.get('token')
+    if not token:
+        flash('Token inválido', 'danger')
+        return redirect(url_for('recuperar'))
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT usuario, expires_at FROM password_resets WHERE token=%s", (token,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        flash('Token inválido o ya usado', 'danger')
+        return redirect(url_for('recuperar'))
+
+    expires_at = row['expires_at']
+    if isinstance(expires_at, str):
+        # por si se guardó como texto
+        expires_at_dt = datetime.fromisoformat(expires_at)
+    else:
+        expires_at_dt = expires_at
+
+    if datetime.utcnow() > expires_at_dt:
+        # token expirado: eliminar y pedir reintento
+        c.execute("DELETE FROM password_resets WHERE token=%s", (token,))
+        conn.commit()
+        conn.close()
+        flash('Token expirado. Solicita recuperar de nuevo.', 'warning')
+        return redirect(url_for('recuperar'))
+
+    if request.method == 'POST':
+        nueva = request.form['nueva_contrasena'].strip()
+        confirmar = request.form['confirmar_contrasena'].strip()
+        if not nueva or not confirmar:
+            flash('Complete ambos campos', 'warning')
+            return redirect(url_for('recuperar_confirm') + f"?token={token}")
+        if nueva != confirmar:
+            flash('Las contraseñas no coinciden', 'warning')
+            return redirect(url_for('recuperar_confirm') + f"?token={token}")
+
+        usuario = row['usuario']
+        # actualizar contraseña en texto plano (según petición)
+        c.execute("UPDATE tecnicos SET contrasena=%s WHERE usuario=%s", (nueva, usuario))
+        # eliminar token
+        c.execute("DELETE FROM password_resets WHERE token=%s", (token,))
+        conn.commit()
+        conn.close()
+        flash('Contraseña actualizada correctamente ✅', 'success')
+        return redirect(url_for('login'))
+
+    # GET -> mostrar formulario
+    conn.close()
+    return render_template('recuperar_confirm.html', token=token)
+
+# -----------------------
+# Resto de rutas (principal, CRUD mantenimiento, export, acta)
+# -----------------------
 @app.route('/principal', methods=['GET', 'POST'])
 @login_required
 def principal():
@@ -312,10 +361,11 @@ def principal():
         conn.commit()
         flash('Registro guardado correctamente', 'success')
 
-    # Dashboard
+    # Últimos registros
     c.execute("SELECT * FROM mantenimiento ORDER BY id DESC LIMIT 10")
     registros = c.fetchall()
 
+    # Dashboard
     c.execute("SELECT COUNT(*) AS total FROM mantenimiento")
     total_mantenimientos = c.fetchone()['total']
 
@@ -379,6 +429,57 @@ def principal():
                        meses_labels=meses_labels,
                        meses_counts=meses_counts)
 
+@app.route('/consultar_registro')
+@login_required
+def consultar():
+    # (si ya existe la ruta, se deja; si hay duplicado, ajusta)
+    search = request.args.get('q', '').strip()
+    sede_filter = request.args.get('sede', 'Todas')
+    page = int(request.args.get('page', 1))
+    per_page = 20
+    offset = (page - 1) * per_page
+
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    query = "SELECT * FROM mantenimiento WHERE 1=1"
+    params = []
+
+    if search:
+        like = f"%{search}%"
+        query += """ AND (
+            sede ILIKE %s OR area ILIKE %s OR tecnico ILIKE %s OR nombre_maquina ILIKE %s OR
+            usuario ILIKE %s OR tipo_equipo ILIKE %s OR marca ILIKE %s OR modelo ILIKE %s OR
+            serial ILIKE %s OR observaciones ILIKE %s
+        )"""
+        params += [like] * 10
+
+    if sede_filter and sede_filter != 'Todas':
+        query += " AND sede = %s"
+        params.append(sede_filter)
+
+    count_query = f"SELECT COUNT(*) FROM ({query}) AS subquery"
+    c.execute(count_query, params)
+    total = c.fetchone()['count']
+    total_pages = (total + per_page - 1) // per_page
+
+    query += " ORDER BY fecha ASC LIMIT %s OFFSET %s"
+    params += [per_page, offset]
+    c.execute(query, params)
+    registros = c.fetchall()
+    conn.close()
+
+    sedes = ["Todas", "Nivel Central", "Barranquilla", "Soledad", "Santa Marta",
+             "El Banco", "Monteria", "Sincelejo", "Valledupar",
+             "El Carmen de Bolivar", "Magangue"]
+
+    return render_template('consultar.html',
+                           registros=registros,
+                           search=search,
+                           sede_filter=sede_filter,
+                           sedes=sedes,
+                           page=page,
+                           total_pages=total_pages)
 
 @app.route('/obtener_registro/<int:rid>')
 @login_required
@@ -394,7 +495,6 @@ def obtener_registro(rid):
         return redirect(url_for('principal'))
 
     return render_template('editar.html', registro=registro)
-
 
 @app.route('/actualizar/<int:rid>', methods=['POST'])
 @login_required
@@ -419,7 +519,6 @@ def actualizar_registro(rid):
     flash('✅ Registro actualizado correctamente', 'success')
     return redirect(url_for('principal'))
 
-
 @app.route('/eliminar/<int:rid>', methods=['POST'])
 @admin_required
 def eliminar(rid):
@@ -430,7 +529,6 @@ def eliminar(rid):
     conn.close()
     flash('Registro eliminado', 'info')
     return redirect(url_for('principal'))
-
 
 @app.route('/exportar')
 @admin_required
@@ -459,7 +557,6 @@ def exportar():
     return send_file(bio, as_attachment=True,
                      download_name='Mantenimiento.xlsx',
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-
 
 @app.route('/acta/<int:rid>')
 @login_required
@@ -498,18 +595,6 @@ def acta_pdf(rid):
     return send_file(buffer, as_attachment=True,
                      download_name=f"Acta_Registro_{registro['id']}.pdf",
                      mimetype='application/pdf')
-
-# -----------------------
-# Configuración de correo
-# -----------------------
-app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
-app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True') == 'True'
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')
-
-mail = Mail(app)
 
 # -----------------------
 # Main
