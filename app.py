@@ -440,6 +440,10 @@ def acta_pdf(rid):
                      mimetype='application/pdf')
 
 
+@app.route('/recuperar')
+def recuperar():
+    return "<h3>Página de recuperación de contraseña en construcción 🛠️</h3>"
+
 # -----------------------
 # Main
 # -----------------------
