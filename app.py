@@ -7,6 +7,7 @@ from io import BytesIO
 from datetime import date
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from functools import wraps
 
 # -----------------------
 # Configuración
@@ -15,7 +16,7 @@ DB_URL = os.environ.get('DATABASE_URL')
 if not DB_URL:
     raise ValueError("Debes configurar DATABASE_URL como variable de entorno con la URL de PostgreSQL de Render")
 
-SECRET_KEY = os.environ.get('SECRET_KEY', 'cambiala_por_una_secreta_en_render')
+SECRET_KEY = os.environ.get('SECRET_KEY', 'clave_secreta_local')
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
@@ -30,7 +31,7 @@ def get_db_connection():
 
 
 # -----------------------
-# Inicializar DB
+# Inicializar DB (asegura roles)
 # -----------------------
 def init_db():
     conn = get_db_connection()
@@ -61,19 +62,50 @@ def init_db():
                     id SERIAL PRIMARY KEY,
                     usuario TEXT UNIQUE,
                     nombre TEXT,
-                    contrasena TEXT
+                    contrasena TEXT,
+                    rol TEXT DEFAULT 'tecnico'
                 )''')
+
+    # Si no existe la columna 'rol' (por versiones viejas), la agregamos
+    c.execute("SELECT column_name FROM information_schema.columns WHERE table_name='tecnicos'")
+    columnas = [r['column_name'] for r in c.fetchall()]
+    if 'rol' not in columnas:
+        c.execute("ALTER TABLE tecnicos ADD COLUMN rol TEXT DEFAULT 'tecnico'")
+
     # Usuario admin por defecto
     c.execute("SELECT * FROM tecnicos WHERE usuario='admin'")
     if not c.fetchone():
-        c.execute("INSERT INTO tecnicos (usuario, nombre, contrasena) VALUES (%s, %s, %s)",
-                  ('admin', 'Administrador', '1234'))
+        c.execute("INSERT INTO tecnicos (usuario, nombre, contrasena, rol) VALUES (%s, %s, %s, %s)",
+                  ('admin', 'Administrador', '1234', 'admin'))
     conn.commit()
     conn.close()
 
 
 with app.app_context():
     init_db()
+
+
+# -----------------------
+# Decoradores de autenticación
+# -----------------------
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'usuario' not in session:
+            flash('Debes iniciar sesión', 'warning')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if session.get('rol') != 'admin':
+            flash('Acceso denegado: solo administradores pueden realizar esta acción', 'danger')
+            return redirect(url_for('principal'))
+        return f(*args, **kwargs)
+    return decorated
 
 
 # -----------------------
@@ -87,10 +119,8 @@ def home():
 
 
 @app.route('/consultar_registro')
+@login_required
 def consultar():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
-
     search = request.args.get('q', '').strip()
     sede_filter = request.args.get('sede', 'Todas')
     page = int(request.args.get('page', 1))
@@ -147,31 +177,35 @@ def login():
         contrasena = request.form['contrasena'].strip()
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT nombre FROM tecnicos WHERE usuario=%s AND contrasena=%s", (usuario, contrasena))
+        c.execute("SELECT nombre, rol FROM tecnicos WHERE usuario=%s AND contrasena=%s", (usuario, contrasena))
         row = c.fetchone()
         conn.close()
         if row:
             session['usuario'] = usuario
             session['nombre'] = row['nombre']
+            session['rol'] = row['rol']
+            flash(f'Bienvenido {row["nombre"]} ({row["rol"]})', 'success')
             return redirect(url_for('principal'))
         flash('Usuario o contraseña incorrectos', 'danger')
     return render_template('login.html')
 
 
 @app.route('/registro', methods=['GET', 'POST'])
+@admin_required
 def registro():
     if request.method == 'POST':
         usuario = request.form['usuario'].strip()
         nombre = request.form['nombre'].strip()
         contrasena = request.form['contrasena'].strip()
+        rol = request.form.get('rol', 'tecnico').strip()
         conn = get_db_connection()
         c = conn.cursor()
         try:
-            c.execute("INSERT INTO tecnicos (usuario, nombre, contrasena) VALUES (%s, %s, %s)",
-                      (usuario, nombre, contrasena))
+            c.execute("INSERT INTO tecnicos (usuario, nombre, contrasena, rol) VALUES (%s, %s, %s, %s)",
+                      (usuario, nombre, contrasena, rol))
             conn.commit()
             flash('Técnico registrado correctamente', 'success')
-            return redirect(url_for('login'))
+            return redirect(url_for('principal'))
         except psycopg2.IntegrityError:
             flash('El usuario ya existe', 'warning')
         finally:
@@ -186,10 +220,8 @@ def logout():
 
 
 @app.route('/principal', methods=['GET', 'POST'])
+@login_required
 def principal():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
-
     conn = get_db_connection()
     c = conn.cursor()
 
@@ -220,11 +252,10 @@ def principal():
         conn.commit()
         flash('Registro guardado correctamente', 'success')
 
-    # Últimos registros
+    # Dashboard
     c.execute("SELECT * FROM mantenimiento ORDER BY id DESC LIMIT 10")
     registros = c.fetchall()
 
-    # Dashboard
     c.execute("SELECT COUNT(*) AS total FROM mantenimiento")
     total_mantenimientos = c.fetchone()['total']
 
@@ -272,6 +303,7 @@ def principal():
     return render_template('principal.html',
                        registros=registros,
                        nombre=session.get('nombre'),
+                       rol=session.get('rol'),
                        hoy=date.today().isoformat(),
                        total_mantenimientos=total_mantenimientos,
                        total_tecnicos=total_tecnicos,
@@ -289,10 +321,8 @@ def principal():
 
 
 @app.route('/obtener_registro/<int:rid>')
+@login_required
 def obtener_registro(rid):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
-
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM mantenimiento WHERE id=%s", (rid,))
@@ -307,10 +337,8 @@ def obtener_registro(rid):
 
 
 @app.route('/actualizar/<int:rid>', methods=['POST'])
+@login_required
 def actualizar_registro(rid):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
-
     conn = get_db_connection()
     c = conn.cursor()
     campos = [
@@ -333,9 +361,8 @@ def actualizar_registro(rid):
 
 
 @app.route('/eliminar/<int:rid>', methods=['POST'])
+@admin_required
 def eliminar(rid):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("DELETE FROM mantenimiento WHERE id=%s", (rid,))
@@ -346,9 +373,8 @@ def eliminar(rid):
 
 
 @app.route('/exportar')
+@admin_required
 def exportar():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM mantenimiento ORDER BY fecha DESC")
@@ -376,10 +402,8 @@ def exportar():
 
 
 @app.route('/acta/<int:rid>')
+@login_required
 def acta_pdf(rid):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
-
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM mantenimiento WHERE id=%s", (rid,))

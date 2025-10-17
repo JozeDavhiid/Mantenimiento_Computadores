@@ -206,7 +206,10 @@
         <div class="d-flex justify-content-start gap-2 mt-3">
           <button type="submit" class="btn btn-primary">Guardar</button>
           <a href="{{ url_for('consultar') }}" class="btn btn-info" target="_blank">Consultar Registros</a>
-          <a href="{{ url_for('exportar') }}" class="btn btn-success">Exportar Excel</a>
+          {% if rol == 'admin' %}
+            <a href="{{ url_for('registro') }}" class="btn btn-secondary">Registrar Técnico</a>
+            <a href="{{ url_for('exportar') }}" class="btn btn-success">Exportar Excel</a>
+          {% endif %}
         </div>
       </form>
     </div>
@@ -253,55 +256,52 @@
       </div>
     </div>
 
-    <!-- ===================== -->
-    <!-- GRÁFICOS -->
-    <!-- ===================== -->
     <div class="row">
-    <!-- === Mantenimientos por Sede === -->
-    <div class="col-md-6 mb-4">
+      <!-- === Mantenimientos por Sede === -->
+      <div class="col-md-6 mb-4">
         <div class="card shadow">
-        <div class="card-header bg-primary text-white fw-bold">Mantenimientos por Sede</div>
-        <div class="card-body chart-container">
+          <div class="card-header bg-primary text-white fw-bold">Mantenimientos por Sede</div>
+          <div class="card-body chart-container">
             <canvas id="chartSedes"></canvas>
+          </div>
         </div>
-        </div>
-    </div>
+      </div>
 
-    <!-- === Tendencia Mensual === -->
-    <div class="col-md-6 mb-4">
+      <!-- === Tendencia Mensual === -->
+      <div class="col-md-6 mb-4">
         <div class="card shadow">
-        <div class="card-header bg-warning text-white fw-bold">Tendencia Mensual</div>
-        <div class="card-body chart-container">
+          <div class="card-header bg-warning text-white fw-bold">Tendencia Mensual</div>
+          <div class="card-body chart-container">
             <canvas id="chartMeses"></canvas>
+          </div>
         </div>
-        </div>
-    </div>
+      </div>
 
-    <!-- === Tipos de Equipos === -->
-    <div class="col-md-6 mb-4">
+      <!-- === Tipos de Equipos === -->
+      <div class="col-md-6 mb-4">
         <div class="card shadow">
-        <div class="card-header bg-success text-white fw-bold">Tipos de Equipos</div>
-        <div class="card-body chart-container chart-large">
+          <div class="card-header bg-success text-white fw-bold">Tipos de Equipos</div>
+          <div class="card-body chart-container chart-large">
             <canvas id="chartEquipos"></canvas>
-        </div>
-        <div class="card-footer text-center fw-bold">
+          </div>
+          <div class="card-footer text-center fw-bold">
             Más común: {{ equipo_mas_comun }}
+          </div>
         </div>
-        </div>
-    </div>
+      </div>
 
-    <!-- === Marcas Más Comunes === -->
-    <div class="col-md-6 mb-4">
+      <!-- === Marcas Más Comunes === -->
+      <div class="col-md-6 mb-4">
         <div class="card shadow">
-        <div class="card-header bg-info text-white fw-bold">Marcas Más Comunes</div>
-        <div class="card-body chart-container chart-large">
+          <div class="card-header bg-info text-white fw-bold">Marcas Más Comunes</div>
+          <div class="card-body chart-container chart-large">
             <canvas id="chartMarcas"></canvas>
-        </div>
-        <div class="card-footer text-center fw-bold">
+          </div>
+          <div class="card-footer text-center fw-bold">
             Más común: {{ marca_mas_comun }}
+          </div>
         </div>
-        </div>
-    </div>
+      </div>
     </div>
   </div>
 
@@ -340,13 +340,15 @@
             <td>{{ r.serial }}</td>
             <td>
               <div class="d-flex gap-2">
-                    <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-warning btn-sm">Editar</a>
-                    <a href="{{ url_for('acta_pdf', rid=r.id) }}" class="btn btn-success btn-sm">Acta</a>
-                    <form action="{{ url_for('eliminar', rid=r.id) }}" method="POST" 
+                <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-warning btn-sm">Editar</a>
+                <a href="{{ url_for('acta_pdf', rid=r.id) }}" class="btn btn-success btn-sm">Acta</a>
+                {% if rol == 'admin' %}
+                  <form action="{{ url_for('eliminar', rid=r.id) }}" method="POST" 
                         onsubmit="return confirm('¿Seguro que deseas eliminar este registro?');" class="m-0 p-0">
-                        <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
-                    </form>
-                </div>
+                    <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+                  </form>
+                {% endif %}
+              </div>
             </td>
           </tr>
           {% endfor %}
@@ -392,60 +394,31 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   new Chart(document.getElementById('chartMarcas'), {
-  type: 'bar',
-  data: {
-    labels: {{ marca_labels|tojson }},
-    datasets: [{
-      label: 'Cantidad por Marca',
-      data: {{ marca_counts|tojson }},
-      backgroundColor: ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6f42c1', '#20c997']
-    }]
-  },
-  options: {
-    indexAxis: 'y', // 🔹 Barras horizontales
-    responsive: true,
-    scales: {
-      x: {
-        beginAtZero: true
-      }
+    type: 'bar',
+    data: {
+      labels: {{ marca_labels|tojson }},
+      datasets: [{
+        label: 'Cantidad por Marca',
+        data: {{ marca_counts|tojson }},
+        backgroundColor: ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6f42c1', '#20c997']
+      }]
     },
-    plugins: {
-      legend: { display: false }
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      scales: { x: { beginAtZero: true } },
+      plugins: { legend: { display: false } }
     }
-  }
   });
 
-  // === Ordenar tabla ===
-  document.querySelectorAll("#tablaRegistros th").forEach(header => {
-    header.addEventListener("click", () => {
-      const table = header.closest("table");
-      const index = Array.from(header.parentNode.children).indexOf(header);
-      const asc = header.classList.toggle("asc");
-      Array.from(table.querySelector("tbody").rows)
-        .sort((a, b) => {
-          const A = a.cells[index].innerText.trim();
-          const B = b.cells[index].innerText.trim();
-          return asc ? A.localeCompare(B, undefined, { numeric: true }) : B.localeCompare(A, undefined, { numeric: true });
-        })
-        .forEach(tr => table.querySelector("tbody").appendChild(tr));
+  // === Mayúsculas automáticas ===
+  const campos = ['nombre_maquina', 'marca', 'modelo', 'serial'];
+  campos.forEach(nombre => {
+    const input = document.querySelector(`[name="${nombre}"]`);
+    if (input) input.addEventListener('input', function() {
+      this.value = this.value.toUpperCase();
     });
   });
-});
-</script>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Campos que deben forzarse a mayúsculas
-    const campos = ['nombre_maquina', 'marca', 'modelo', 'serial'];
-
-    campos.forEach(nombre => {
-        const input = document.querySelector(`[name="${nombre}"]`);
-        if (input) {
-            input.addEventListener('input', function() {
-                this.value = this.value.toUpperCase();
-            });
-        }
-    });
 });
 </script>
 
