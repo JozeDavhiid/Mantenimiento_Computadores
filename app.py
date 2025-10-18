@@ -1,37 +1,35 @@
 import os
 import re
 import secrets
-import smtplib
-from datetime import datetime, timedelta
-from email.message import EmailMessage
+from datetime import datetime, timedelta, date
+from functools import wraps
+
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import openpyxl
 from io import BytesIO
-from datetime import date
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
-from functools import wraps
+
+# SendGrid
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 # -----------------------
-# Configuración / SMTP desde variables de entorno
+# Configuración / SendGrid desde variables de entorno
 # -----------------------
 DB_URL = os.environ.get('DATABASE_URL')
 if not DB_URL:
     raise ValueError("Debes configurar DATABASE_URL como variable de entorno con la URL de PostgreSQL de Render")
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'clave_secreta_local')
-
-# SMTP SendGrid
-SMTP_HOST = os.environ.get('SMTP_HOST')       # debe ser smtp.sendgrid.net
-SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
-SMTP_USER = os.environ.get('SMTP_USER')       # 'apikey'
-SMTP_PASS = os.environ.get('SMTP_PASS')       # API Key de SendGrid
-SMTP_FROM = os.environ.get('SMTP_FROM', SMTP_USER)
+SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')   # <-- tu API key de SendGrid
+SENDGRID_FROM = os.environ.get('SENDGRID_FROM') or os.environ.get('SMTP_FROM')  # correo remitente
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
+
 
 # -----------------------
 # Función conexión DB
@@ -40,8 +38,9 @@ def get_db_connection():
     conn = psycopg2.connect(DB_URL, cursor_factory=RealDictCursor)
     return conn
 
+
 # -----------------------
-# Inicializar DB
+# Inicializar DB (asegura columnas/tabla reset)
 # -----------------------
 def init_db():
     conn = get_db_connection()
@@ -67,7 +66,7 @@ def init_db():
                     activo_fijo TEXT,
                     observaciones TEXT
                 )''')
-    # Tabla tecnicos
+    # Tabla tecnicos (añadimos columna correo si no existe y rol)
     c.execute('''CREATE TABLE IF NOT EXISTS tecnicos (
                     id SERIAL PRIMARY KEY,
                     usuario TEXT UNIQUE,
@@ -83,19 +82,22 @@ def init_db():
                     token TEXT UNIQUE,
                     expires_at TIMESTAMP
                 )''')
-    # Usuario admin por defecto
+    # Usuario admin por defecto (si no existe)
     c.execute("SELECT * FROM tecnicos WHERE usuario='admin'")
     if not c.fetchone():
+        # contraseña en texto plano por compatibilidad (puedes cambiarla luego)
         c.execute("INSERT INTO tecnicos (usuario, nombre, correo, contrasena, rol) VALUES (%s,%s,%s,%s,%s)",
                   ('admin', 'Administrador', 'admin@example.com', '1234', 'admin'))
     conn.commit()
     conn.close()
 
+
 with app.app_context():
     init_db()
 
+
 # -----------------------
-# Decoradores
+# Decoradores utilitarios
 # -----------------------
 def login_required(f):
     @wraps(f)
@@ -106,6 +108,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
+
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -115,40 +118,34 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
+
 # -----------------------
-# Función enviar correo con SendGrid SMTP
+# Util: enviar correo mediante SendGrid API
 # -----------------------
 def send_email(to_email: str, subject: str, body: str):
     """
-    Envía un correo usando SendGrid SMTP.
-    Variables de entorno necesarias:
-        SMTP_HOST   -> smtp.sendgrid.net
-        SMTP_PORT   -> 587
-        SMTP_USER   -> 'apikey' (literal)
-        SMTP_PASS   -> tu API Key de SendGrid
-        SMTP_FROM   -> correo remitente verificado en SendGrid
+    Envía correo usando la API de SendGrid.
+    Requiere la variable de entorno SENDGRID_API_KEY y SENDGRID_FROM.
     """
-    if not SMTP_HOST or not SMTP_USER or not SMTP_PASS:
-        raise RuntimeError("SMTP no configurado correctamente")
+    if not SENDGRID_API_KEY or not SENDGRID_FROM:
+        app.logger.error("SendGrid no está configurado (falta SENDGRID_API_KEY o SENDGRID_FROM).")
+        raise RuntimeError("SendGrid no configurado")
 
-    msg = EmailMessage()
-    msg['From'] = SMTP_FROM
-    msg['To'] = to_email
-    msg['Subject'] = subject
-    msg.set_content(body)
-
+    message = Mail(
+        from_email=SENDGRID_FROM,
+        to_emails=to_email,
+        subject=subject,
+        plain_text_content=body
+    )
     try:
-        # Conexión SMTP TLS
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as smtp:
-            smtp.ehlo()
-            smtp.starttls()  # Inicia cifrado TLS
-            smtp.ehlo()
-            smtp.login(SMTP_USER, SMTP_PASS)
-            smtp.send_message(msg)
-            app.logger.info(f"Correo enviado a {to_email}")
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        resp = sg.send(message)
+        app.logger.info(f"SendGrid response: {resp.status_code}")
+        return resp.status_code
     except Exception as e:
-        app.logger.exception("Error enviando correo")
+        app.logger.exception("Error enviando correo con SendGrid")
         raise
+
 
 # -----------------------
 # Rutas principales
@@ -159,24 +156,29 @@ def home():
         return redirect(url_for('principal'))
     return redirect(url_for('login'))
 
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         usuario = request.form['usuario'].strip()
         contrasena = request.form['contrasena'].strip()
+
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("SELECT usuario, nombre, correo, contrasena, rol FROM tecnicos WHERE usuario=%s", (usuario,))
         row = c.fetchone()
         conn.close()
+
+        # COMPARACIÓN EN TEXTO PLANO (según petición)
         if row and row['contrasena'] == contrasena:
             session['usuario'] = row['usuario']
             session['nombre'] = row['nombre']
-            session['rol'] = row.get('rol', 'tecnico')
-            #flash(f'Bienvenido {row["nombre"]}', 'success')
+            session['rol'] = row.get('rol', 'tecnico') if isinstance(row, dict) else 'tecnico'
+            flash(f'Bienvenido {row["nombre"]}', 'success')
             return redirect(url_for('principal'))
         flash('Usuario o contraseña incorrectos', 'danger')
     return render_template('login.html')
+
 
 @app.route('/registro', methods=['GET', 'POST'])
 @admin_required
@@ -186,13 +188,17 @@ def registro():
         nombre = request.form['nombre'].strip()
         correo = request.form['correo'].strip()
         contrasena = request.form['contrasena'].strip()
+
+        # validaciones
         if not usuario or not nombre or not correo or not contrasena:
             flash('Complete todos los campos', 'warning')
             return redirect(url_for('registro'))
+
         patron_correo = r'^[^@]+@[^@]+\.[^@]+$'
         if not re.match(patron_correo, correo):
             flash('Formato de correo inválido', 'warning')
             return redirect(url_for('registro'))
+
         conn = get_db_connection()
         c = conn.cursor()
         try:
@@ -209,13 +215,15 @@ def registro():
             conn.close()
     return render_template('registro.html')
 
+
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
 
+
 # -----------------------
-# Recuperación por correo
+# Recuperación por correo (SendGrid)
 # -----------------------
 @app.route('/recuperar', methods=['GET', 'POST'])
 def recuperar():
@@ -224,6 +232,7 @@ def recuperar():
         if not usuario:
             flash('Ingresa tu usuario', 'warning')
             return redirect(url_for('recuperar'))
+
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("SELECT correo FROM tecnicos WHERE usuario=%s", (usuario,))
@@ -232,6 +241,7 @@ def recuperar():
             conn.close()
             flash('Usuario no encontrado', 'danger')
             return redirect(url_for('recuperar'))
+
         correo = row['correo']
         token = secrets.token_urlsafe(32)
         expires_at = datetime.utcnow() + timedelta(hours=1)
@@ -239,8 +249,10 @@ def recuperar():
                   (usuario, token, expires_at))
         conn.commit()
         conn.close()
+
         base = request.host_url.rstrip('/')
         link = f"{base}{url_for('recuperar_confirm')}?token={token}"
+
         subject = "Recuperación de contraseña - Mantenimiento"
         body = f"""Hola {usuario},
 
@@ -257,10 +269,12 @@ Admin - Sistema de Mantenimiento
         try:
             send_email(correo, subject, body)
             flash('Se ha enviado un correo con las instrucciones. Revisa tu bandeja.', 'info')
-        except Exception as e:
-            flash('No se pudo enviar el correo. Consulta la configuración SMTP.', 'danger')
+        except Exception:
+            flash('No se pudo enviar el correo. Consulta la configuración de SendGrid.', 'danger')
         return redirect(url_for('login'))
+
     return render_template('recuperar.html')
+
 
 @app.route('/recuperar/confirm', methods=['GET', 'POST'])
 def recuperar_confirm():
@@ -268,6 +282,7 @@ def recuperar_confirm():
     if not token:
         flash('Token inválido', 'danger')
         return redirect(url_for('recuperar'))
+
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT usuario, expires_at FROM password_resets WHERE token=%s", (token,))
@@ -276,13 +291,20 @@ def recuperar_confirm():
         conn.close()
         flash('Token inválido o ya usado', 'danger')
         return redirect(url_for('recuperar'))
+
     expires_at = row['expires_at']
-    if datetime.utcnow() > expires_at:
+    if isinstance(expires_at, str):
+        expires_at_dt = datetime.fromisoformat(expires_at)
+    else:
+        expires_at_dt = expires_at
+
+    if datetime.utcnow() > expires_at_dt:
         c.execute("DELETE FROM password_resets WHERE token=%s", (token,))
         conn.commit()
         conn.close()
         flash('Token expirado. Solicita recuperar de nuevo.', 'warning')
         return redirect(url_for('recuperar'))
+
     if request.method == 'POST':
         nueva = request.form['nueva_contrasena'].strip()
         confirmar = request.form['confirmar_contrasena'].strip()
@@ -292,15 +314,19 @@ def recuperar_confirm():
         if nueva != confirmar:
             flash('Las contraseñas no coinciden', 'warning')
             return redirect(url_for('recuperar_confirm') + f"?token={token}")
+
         usuario = row['usuario']
+        # actualizar contraseña en texto plano (según petición)
         c.execute("UPDATE tecnicos SET contrasena=%s WHERE usuario=%s", (nueva, usuario))
         c.execute("DELETE FROM password_resets WHERE token=%s", (token,))
         conn.commit()
         conn.close()
         flash('Contraseña actualizada correctamente ✅', 'success')
         return redirect(url_for('login'))
+
     conn.close()
     return render_template('recuperar_confirm.html', token=token)
+
 
 # -----------------------
 # Resto de rutas (principal, CRUD mantenimiento, export, acta)
@@ -406,10 +432,10 @@ def principal():
                        meses_labels=meses_labels,
                        meses_counts=meses_counts)
 
+
 @app.route('/consultar_registro')
 @login_required
-def consultar():
-    # (si ya existe la ruta, se deja; si hay duplicado, ajusta)
+def consultar_registro():
     search = request.args.get('q', '').strip()
     sede_filter = request.args.get('sede', 'Todas')
     page = int(request.args.get('page', 1))
@@ -458,6 +484,7 @@ def consultar():
                            page=page,
                            total_pages=total_pages)
 
+
 @app.route('/obtener_registro/<int:rid>')
 @login_required
 def obtener_registro(rid):
@@ -472,6 +499,7 @@ def obtener_registro(rid):
         return redirect(url_for('principal'))
 
     return render_template('editar.html', registro=registro)
+
 
 @app.route('/actualizar/<int:rid>', methods=['POST'])
 @login_required
@@ -496,6 +524,7 @@ def actualizar_registro(rid):
     flash('✅ Registro actualizado correctamente', 'success')
     return redirect(url_for('principal'))
 
+
 @app.route('/eliminar/<int:rid>', methods=['POST'])
 @admin_required
 def eliminar(rid):
@@ -506,6 +535,7 @@ def eliminar(rid):
     conn.close()
     flash('Registro eliminado', 'info')
     return redirect(url_for('principal'))
+
 
 @app.route('/exportar')
 @admin_required
@@ -534,6 +564,7 @@ def exportar():
     return send_file(bio, as_attachment=True,
                      download_name='Mantenimiento.xlsx',
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
 
 @app.route('/acta/<int:rid>')
 @login_required
@@ -572,6 +603,7 @@ def acta_pdf(rid):
     return send_file(buffer, as_attachment=True,
                      download_name=f"Acta_Registro_{registro['id']}.pdf",
                      mimetype='application/pdf')
+
 
 # -----------------------
 # Main
