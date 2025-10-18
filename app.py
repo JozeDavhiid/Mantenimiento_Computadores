@@ -173,7 +173,7 @@ def login():
             session['usuario'] = row['usuario']
             session['nombre'] = row['nombre']
             session['rol'] = row.get('rol', 'tecnico')
-            flash(f'Bienvenido {row["nombre"]}', 'success')
+            #flash(f'Bienvenido {row["nombre"]}', 'success')
             return redirect(url_for('principal'))
         flash('Usuario o contraseña incorrectos', 'danger')
     return render_template('login.html')
