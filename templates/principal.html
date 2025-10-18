@@ -254,7 +254,7 @@
 
         <div class="d-flex flex-wrap gap-2 mt-3">
           <button type="submit" class="btn btn-primary">Guardar</button>
-          <a href="{{ url_for('consultar_registro') }}" class="btn btn-info" target="_blank">Consultar</a>
+          <a href="{{ url_for('consultar') }}" class="btn btn-info" target="_blank">Consultar</a>
           {% if rol == 'admin' %}
             <a href="{{ url_for('registro') }}" class="btn btn-secondary">Registrar Técnico</a>
             <a href="{{ url_for('exportar') }}" class="btn btn-success">Exportar Excel</a>
