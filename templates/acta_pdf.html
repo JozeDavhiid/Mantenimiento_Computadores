@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Acta de Mantenimiento</title>
+  <style>
+    body {
+      font-family: 'Helvetica', sans-serif;
+      margin: 40px;
+      font-size: 12px;
+      color: #333;
+    }
+
+    header {
+      text-align: center;
+      border-bottom: 2px solid #0d6efd;
+      padding-bottom: 10px;
+      margin-bottom: 25px;
+    }
+
+    header img {
+      width: 100px;
+      height: auto;
+      float: left;
+    }
+
+    header h1 {
+      font-size: 20px;
+      color: #0d6efd;
+      margin: 0;
+    }
+
+    header p {
+      font-size: 13px;
+      margin: 0;
+    }
+
+    h2 {
+      font-size: 16px;
+      margin-top: 25px;
+      color: #0d6efd;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 4px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    th, td {
+      padding: 8px;
+      border: 1px solid #ccc;
+      text-align: left;
+    }
+
+    th {
+      background-color: #e9ecef;
+      font-weight: bold;
+      color: #0d6efd;
+    }
+
+    .observaciones {
+      margin-top: 20px;
+      background: #f8f9fa;
+      border: 1px solid #ddd;
+      padding: 10px;
+      border-radius: 6px;
+    }
+
+    footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 11px;
+      color: #666;
+      border-top: 1px solid #ddd;
+      padding-top: 5px;
+    }
+
+    .firma {
+      margin-top: 50px;
+      text-align: center;
+    }
+
+    .firma-linea {
+      width: 250px;
+      border-top: 1px solid #000;
+      margin: 0 auto;
+      margin-top: 40px;
+    }
+
+    .info-empresa {
+      font-size: 11px;
+      color: #555;
+      margin-top: 3px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <!-- Si tienes un logo, puedes guardarlo en /static/logo.png -->
+  <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+  <h1>Acta de Mantenimiento Preventivo</h1>
+  <p>Sistema de Mantenimiento de Equipos Informáticos</p>
+</header>
+
+<h2>🧾 Información del Mantenimiento</h2>
+<table>
+  <tr><th>ID</th><td>{{ registro.id }}</td></tr>
+  <tr><th>Fecha</th><td>{{ registro.fecha }}</td></tr>
+  <tr><th>Sede</th><td>{{ registro.sede }}</td></tr>
+  <tr><th>Área</th><td>{{ registro.area }}</td></tr>
+  <tr><th>Técnico</th><td>{{ registro.tecnico }}</td></tr>
+  <tr><th>Nombre Máquina</th><td>{{ registro.nombre_maquina }}</td></tr>
+  <tr><th>Usuario del Equipo</th><td>{{ registro.usuario }}</td></tr>
+  <tr><th>Tipo de Equipo</th><td>{{ registro.tipo_equipo }}</td></tr>
+  <tr><th>Marca</th><td>{{ registro.marca }}</td></tr>
+  <tr><th>Modelo</th><td>{{ registro.modelo }}</td></tr>
+  <tr><th>Serial</th><td>{{ registro.serial }}</td></tr>
+  <tr><th>Sistema Operativo</th><td>{{ registro.sistema_operativo }}</td></tr>
+  <tr><th>Office</th><td>{{ registro.office }}</td></tr>
+  <tr><th>Antivirus</th><td>{{ registro.antivirus }}</td></tr>
+  <tr><th>Compresor</th><td>{{ registro.compresor }}</td></tr>
+  <tr><th>Control Remoto</th><td>{{ registro.control_remoto }}</td></tr>
+  <tr><th>Activo Fijo</th><td>{{ registro.activo_fijo }}</td></tr>
+</table>
+
+<h2>📝 Observaciones</h2>
+<div class="observaciones">
+  <p>{{ registro.observaciones or 'N/A' }}</p>
+</div>
+
+<div class="firma">
+  <div class="firma-linea"></div>
+  <p><strong>{{ registro.tecnico }}</strong><br>Técnico Responsable</p>
+</div>
+
+<footer>
+  <p>Documento generado automáticamente por el Sistema de Mantenimiento | {{ fecha_actual }}</p>
+  <p class="info-empresa">© {{ anio_actual }} - Soporte Técnico | Todos los derechos reservados</p>
+</footer>
+
+</body>
+</html>
