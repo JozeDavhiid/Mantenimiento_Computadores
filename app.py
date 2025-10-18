@@ -16,6 +16,11 @@ from reportlab.pdfgen import canvas
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
+# Actas
+from flask import render_template, make_response
+from weasyprint import HTML
+import datetime
+
 # -----------------------
 # Configuración / SendGrid desde variables de entorno
 # -----------------------
@@ -565,44 +570,29 @@ def exportar():
                      download_name='Mantenimiento.xlsx',
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
-
-@app.route('/acta/<int:rid>')
+@app.route('/acta_pdf/<int:rid>')
 @login_required
 def acta_pdf(rid):
     conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM mantenimiento WHERE id=%s", (rid,))
-    registro = c.fetchone()
+    registro = conn.execute("SELECT * FROM mantenimiento WHERE id = %s", (rid,)).fetchone()
     conn.close()
 
     if not registro:
-        flash('Registro no encontrado', 'warning')
+        flash("Registro no encontrado", "danger")
         return redirect(url_for('principal'))
 
-    buffer = BytesIO()
-    c_pdf = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
-    c_pdf.setFont("Helvetica", 12)
-    y = height - 50
-    c_pdf.drawString(50, y, f"Acta de Mantenimiento - ID: {registro['id']}")
-    y -= 25
+    html = render_template(
+        'acta_pdf.html',
+        registro=registro,
+        fecha_actual=datetime.date.today().strftime("%d/%m/%Y"),
+        anio_actual=datetime.date.today().year
+    )
 
-    for k, v in registro.items():
-        texto = f"{k.replace('_',' ').title()}: {v}"
-        for linea in [texto[i:i+100] for i in range(0, len(texto), 100)]:
-            c_pdf.drawString(50, y, linea)
-            y -= 15
-            if y < 50:
-                c_pdf.showPage()
-                c_pdf.setFont("Helvetica", 12)
-                y = height - 50
-
-    c_pdf.save()
-    buffer.seek(0)
-
-    return send_file(buffer, as_attachment=True,
-                     download_name=f"Acta_Registro_{registro['id']}.pdf",
-                     mimetype='application/pdf')
+    pdf = HTML(string=html).write_pdf()
+    response = make_response(pdf)
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'inline; filename=Acta_{registro["id"]}.pdf'
+    return response
 
 
 # -----------------------
