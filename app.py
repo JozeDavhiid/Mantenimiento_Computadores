@@ -23,11 +23,11 @@ if not DB_URL:
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'clave_secreta_local')
 
-# SMTP settings
-SMTP_HOST = os.environ.get('SMTP_HOST')       # e.g. "smtp.gmail.com"
+# SMTP SendGrid
+SMTP_HOST = os.environ.get('SMTP_HOST')       # debe ser smtp.sendgrid.net
 SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
-SMTP_USER = os.environ.get('SMTP_USER')       # tu usuario SMTP (email)
-SMTP_PASS = os.environ.get('SMTP_PASS')       # password o app password
+SMTP_USER = os.environ.get('SMTP_USER')       # 'apikey'
+SMTP_PASS = os.environ.get('SMTP_PASS')       # API Key de SendGrid
 SMTP_FROM = os.environ.get('SMTP_FROM', SMTP_USER)
 
 app = Flask(__name__)
@@ -116,24 +116,39 @@ def admin_required(f):
     return decorated
 
 # -----------------------
-# Función enviar correo
+# Función enviar correo con SendGrid SMTP
 # -----------------------
 def send_email(to_email: str, subject: str, body: str):
+    """
+    Envía un correo usando SendGrid SMTP.
+    Variables de entorno necesarias:
+        SMTP_HOST   -> smtp.sendgrid.net
+        SMTP_PORT   -> 587
+        SMTP_USER   -> 'apikey' (literal)
+        SMTP_PASS   -> tu API Key de SendGrid
+        SMTP_FROM   -> correo remitente verificado en SendGrid
+    """
     if not SMTP_HOST or not SMTP_USER or not SMTP_PASS:
         raise RuntimeError("SMTP no configurado correctamente")
+
     msg = EmailMessage()
     msg['From'] = SMTP_FROM
     msg['To'] = to_email
     msg['Subject'] = subject
     msg.set_content(body)
 
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as smtp:
-        smtp.ehlo()
-        if SMTP_PORT in (587, 25):
-            smtp.starttls()
+    try:
+        # Conexión SMTP TLS
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as smtp:
             smtp.ehlo()
-        smtp.login(SMTP_USER, SMTP_PASS)
-        smtp.send_message(msg)
+            smtp.starttls()  # Inicia cifrado TLS
+            smtp.ehlo()
+            smtp.login(SMTP_USER, SMTP_PASS)
+            smtp.send_message(msg)
+            app.logger.info(f"Correo enviado a {to_email}")
+    except Exception as e:
+        app.logger.exception("Error enviando correo")
+        raise
 
 # -----------------------
 # Rutas principales
@@ -243,7 +258,6 @@ Admin - Sistema de Mantenimiento
             send_email(correo, subject, body)
             flash('Se ha enviado un correo con las instrucciones. Revisa tu bandeja.', 'info')
         except Exception as e:
-            app.logger.exception("Error enviando correo de recuperación")
             flash('No se pudo enviar el correo. Consulta la configuración SMTP.', 'danger')
         return redirect(url_for('login'))
     return render_template('recuperar.html')
