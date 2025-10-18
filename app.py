@@ -435,7 +435,7 @@ def principal():
 
 @app.route('/consultar_registro')
 @login_required
-def consultar_registro():
+def consultar():
     search = request.args.get('q', '').strip()
     sede_filter = request.args.get('sede', 'Todas')
     page = int(request.args.get('page', 1))
