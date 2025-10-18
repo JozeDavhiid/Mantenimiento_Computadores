@@ -358,7 +358,7 @@
             <td>{{ r.modelo }}</td>
             <td>{{ r.serial }}</td>
             <td>
-              <div class="btn-group btn-group-sm">
+              <div class="d-flex gap-2">
                 <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-warning">Editar</a>
                 <a href="{{ url_for('acta_pdf', rid=r.id) }}" class="btn btn-success">Acta</a>
                 {% if rol == 'admin' %}
