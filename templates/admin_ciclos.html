@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Administración de Ciclos{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4 text-center">
+        <i class="bi bi-calendar-check"></i> Administración de Ciclos Trimestrales
+    </h2>
+
+    {% if activo %}
+        <div class="alert alert-success shadow-sm">
+            <strong>Ciclo activo:</strong> {{ activo.nombre }} 
+            (Trimestre {{ activo.trimestre }} - {{ activo.anio }})
+            {% if activo.fecha_inicio %}
+                | Inicio: {{ activo.fecha_inicio }}
+            {% endif %}
+            <form action="{{ url_for('cerrar_ciclo', cid=activo.id) }}" method="POST" class="d-inline-block float-end" 
+                  onsubmit="return confirm('¿Seguro que deseas cerrar este ciclo? Esta acción no se puede deshacer.');">
+                <button type="submit" class="btn btn-danger btn-sm">
+                    <i class="bi bi-lock"></i> Cerrar Ciclo
+                </button>
+            </form>
+        </div>
+    {% else %}
+        <div class="alert alert-warning shadow-sm text-center">
+            <i class="bi bi-exclamation-triangle"></i> No hay un ciclo activo actualmente.
+        </div>
+    {% endif %}
+
+    {% if session.get('rol') == 'admin' %}
+    <!-- Formulario para crear nuevo ciclo -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <i class="bi bi-plus-circle"></i> Crear nuevo ciclo
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('admin_ciclos') }}" method="POST" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Nombre del Ciclo</label>
+                    <input type="text" name="nombre" class="form-control" placeholder="Ej. Mantenimiento Q4 2025" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Trimestre</label>
+                    <select name="trimestre" class="form-select" required>
+                        <option value="">Seleccione...</option>
+                        <option value="1">1° Trimestre</option>
+                        <option value="2">2° Trimestre</option>
+                        <option value="3">3° Trimestre</option>
+                        <option value="4">4° Trimestre</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Año</label>
+                    <input type="number" name="anio" class="form-control" value="{{ 2025 }}" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Fecha Inicio</label>
+                    <input type="date" name="fecha_inicio" class="form-control">
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label">Observaciones</label>
+                    <textarea name="observaciones" class="form-control" rows="2" placeholder="Notas u observaciones"></textarea>
+                </div>
+                <div class="col-md-12 text-end">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-save"></i> Crear y Activar Ciclo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tabla de ciclos existentes -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-secondary text-white">
+            <i class="bi bi-list-ul"></i> Historial de Ciclos
+        </div>
+        <div class="card-body table-responsive">
+            {% if ciclos %}
+            <table class="table table-striped align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Trimestre</th>
+                        <th>Año</th>
+                        <th>Inicio</th>
+                        <th>Cierre</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ciclo in ciclos %}
+                    <tr>
+                        <td>{{ ciclo.id }}</td>
+                        <td>{{ ciclo.nombre }}</td>
+                        <td>{{ ciclo.trimestre }}</td>
+                        <td>{{ ciclo.anio }}</td>
+                        <td>{{ ciclo.fecha_inicio or '-' }}</td>
+                        <td>{{ ciclo.fecha_cierre or '-' }}</td>
+                        <td>
+                            {% if ciclo.activo %}
+                                <span class="badge bg-success">Activo</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Cerrado</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if ciclo.activo %}
+                                <form action="{{ url_for('cerrar_ciclo', cid=ciclo.id) }}" method="POST"
+                                      onsubmit="return confirm('¿Cerrar este ciclo? No podrás revertirlo.');">
+                                    <button type="submit" class="btn btn-danger btn-sm">
+                                        <i class="bi bi-lock"></i> Cerrar
+                                    </button>
+                                </form>
+                            {% else %}
+                                <small class="text-muted">Sin acciones</small>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+                <div class="text-center text-muted">No hay ciclos registrados.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

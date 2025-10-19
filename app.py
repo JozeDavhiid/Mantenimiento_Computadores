@@ -51,7 +51,7 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     c = conn.cursor()
-    # Tabla mantenimiento
+    # Tabla mantenimiento (añadimos columnas ciclo_id y cerrado si no existen)
     c.execute('''CREATE TABLE IF NOT EXISTS mantenimiento (
                     id SERIAL PRIMARY KEY,
                     sede TEXT,
@@ -72,6 +72,10 @@ def init_db():
                     activo_fijo TEXT,
                     observaciones TEXT
                 )''')
+    # Añadir columna ciclo_id y cerrado si no existen
+    c.execute("ALTER TABLE mantenimiento ADD COLUMN IF NOT EXISTS ciclo_id INTEGER")
+    c.execute("ALTER TABLE mantenimiento ADD COLUMN IF NOT EXISTS cerrado BOOLEAN DEFAULT FALSE")
+
     # Tabla tecnicos (añadimos columna correo si no existe y rol)
     c.execute('''CREATE TABLE IF NOT EXISTS tecnicos (
                     id SERIAL PRIMARY KEY,
@@ -88,6 +92,20 @@ def init_db():
                     token TEXT UNIQUE,
                     expires_at TIMESTAMP
                 )''')
+
+    # tabla ciclos para gestionar periodos trimestrales
+    c.execute('''CREATE TABLE IF NOT EXISTS ciclos (
+                    id SERIAL PRIMARY KEY,
+                    nombre TEXT,
+                    trimestre INTEGER,
+                    anio INTEGER,
+                    fecha_inicio DATE,
+                    fecha_cierre DATE,
+                    activo BOOLEAN DEFAULT FALSE,
+                    observaciones TEXT,
+                    creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )''')
+
     # Usuario admin por defecto (si no existe)
     c.execute("SELECT * FROM tecnicos WHERE usuario='admin'")
     if not c.fetchone():
@@ -158,7 +176,33 @@ def send_email(to_email: str, subject: str, body: str, html_content: str = None)
 
 
 # -----------------------
-# Rutas principales
+# Helpers relacionados a ciclos
+# -----------------------
+def get_active_cycle(conn=None):
+    """Devuelve el ciclo activo (dict) o None."""
+    close_conn = False
+    if conn is None:
+        conn = get_db_connection()
+        close_conn = True
+    c = conn.cursor()
+    c.execute("SELECT * FROM ciclos WHERE activo=TRUE ORDER BY id DESC LIMIT 1")
+    ciclo = c.fetchone()
+    if close_conn:
+        conn.close()
+    return ciclo
+
+
+def has_active_cycle():
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) as cnt FROM ciclos WHERE activo=TRUE")
+    cnt = c.fetchone()['cnt']
+    conn.close()
+    return cnt > 0
+
+
+# -----------------------
+# Rutas principales (sin cambios de nombres)
 # -----------------------
 @app.route('/')
 def home():
@@ -238,7 +282,7 @@ def logout():
 
 
 # -----------------------
-# Recuperación por correo (SendGrid)
+# Recuperación por correo (SendGrid) - sin cambios lógicos
 # -----------------------
 @app.route('/recuperar', methods=['GET', 'POST'])
 def recuperar():
@@ -367,6 +411,106 @@ def recuperar_confirm():
 
 
 # -----------------------
+# Administración de ciclos (nueva página /admin/ciclos)
+# -----------------------
+@app.route('/admin/ciclos', methods=['GET', 'POST'])
+@admin_required
+def admin_ciclos():
+    """
+    GET: muestra la lista de ciclos y el ciclo activo
+    POST: crea un nuevo ciclo (solo si no hay ciclo activo)
+    """
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    if request.method == 'POST':
+        # crear nuevo ciclo
+        nombre = request.form.get('nombre', '').strip()
+        trimestre = int(request.form.get('trimestre', 0))
+        anio = int(request.form.get('anio', date.today().year))
+        fecha_inicio = request.form.get('fecha_inicio') or None
+        observaciones = request.form.get('observaciones', '').strip()
+
+        # Validaciones básicas
+        if not nombre or trimestre not in (1, 2, 3, 4):
+            flash('Nombre y trimestre (1-4) son obligatorios', 'warning')
+            conn.close()
+            return redirect(url_for('admin_ciclos'))
+
+        # impedir crear si ya hay un ciclo activo
+        c.execute("SELECT COUNT(*) AS cnt FROM ciclos WHERE activo=TRUE")
+        if c.fetchone()['cnt'] > 0:
+            flash('Ya existe un ciclo activo. Cierra el ciclo activo antes de crear uno nuevo.', 'warning')
+            conn.close()
+            return redirect(url_for('admin_ciclos'))
+
+        try:
+            c.execute("""INSERT INTO ciclos (nombre, trimestre, anio, fecha_inicio, observaciones, activo)
+                         VALUES (%s,%s,%s,%s,%s,TRUE)""",
+                      (nombre, trimestre, anio, fecha_inicio, observaciones))
+            conn.commit()
+            flash('Ciclo creado y activado correctamente', 'success')
+        except Exception:
+            conn.rollback()
+            app.logger.exception("Error creando ciclo")
+            flash('Error creando ciclo', 'danger')
+        finally:
+            # seguir para mostrar la lista
+            pass
+
+    # listar ciclos (más reciente primero)
+    c.execute("SELECT * FROM ciclos ORDER BY creado_en DESC")
+    ciclos = c.fetchall()
+
+    # ciclo activo (si existe)
+    c.execute("SELECT * FROM ciclos WHERE activo=TRUE ORDER BY id DESC LIMIT 1")
+    activo = c.fetchone()
+
+    conn.close()
+    return render_template('admin_ciclos.html', ciclos=ciclos, activo=activo)
+
+
+@app.route('/admin/ciclos/cerrar/<int:cid>', methods=['POST'])
+@admin_required
+def cerrar_ciclo(cid):
+    """
+    Cierra el ciclo especificado:
+    - marca ciclos.activo = FALSE y fecha_cierre = hoy
+    - marca mantenimiento.cerrado = TRUE para registros con ciclo_id = cid
+    """
+    conn = get_db_connection()
+    c = conn.cursor()
+    # verificar que exista y sea activo
+    c.execute("SELECT * FROM ciclos WHERE id=%s", (cid,))
+    ciclo = c.fetchone()
+    if not ciclo:
+        conn.close()
+        flash('Ciclo no encontrado', 'warning')
+        return redirect(url_for('admin_ciclos'))
+
+    if not ciclo['activo']:
+        conn.close()
+        flash('El ciclo ya está cerrado', 'info')
+        return redirect(url_for('admin_ciclos'))
+
+    try:
+        hoy = date.today()
+        c.execute("UPDATE ciclos SET activo=FALSE, fecha_cierre=%s WHERE id=%s", (hoy, cid))
+        # marcar mantenimientos de ese ciclo como cerrados
+        c.execute("UPDATE mantenimiento SET cerrado=TRUE WHERE ciclo_id=%s", (cid,))
+        conn.commit()
+        flash('Ciclo cerrado correctamente. Los registros del ciclo ahora son de solo lectura.', 'success')
+    except Exception:
+        conn.rollback()
+        app.logger.exception("Error cerrando ciclo")
+        flash('Error al cerrar ciclo', 'danger')
+    finally:
+        conn.close()
+
+    return redirect(url_for('admin_ciclos'))
+
+
+# -----------------------
 # Resto de rutas (principal, CRUD mantenimiento, export, acta)
 # -----------------------
 @app.route('/principal', methods=['GET', 'POST'])
@@ -375,7 +519,16 @@ def principal():
     conn = get_db_connection()
     c = conn.cursor()
 
+    # Obtener ciclo activo (si existe)
+    ciclo_activo = get_active_cycle(conn)
+
     if request.method == 'POST' and request.form.get('action') == 'guardar':
+        # Si no hay ciclo activo, no permitimos guardar (según tu requerimiento de ciclos manuales)
+        if not ciclo_activo:
+            flash('No hay un ciclo activo. Contacta al administrador para abrir un ciclo antes de registrar mantenimientos.', 'warning')
+            conn.close()
+            return redirect(url_for('principal'))
+
         datos = (
             request.form.get('sede', ''),
             request.form.get('fecha', date.today().isoformat()),
@@ -393,61 +546,112 @@ def principal():
             request.form.get('compresor', ''),
             request.form.get('control_remoto', ''),
             request.form.get('activo_fijo', ''),
-            request.form.get('observaciones', '')
+            request.form.get('observaciones', ''),
+            ciclo_activo['id']  # ciclo_id
         )
         c.execute('''INSERT INTO mantenimiento
                     (sede, fecha, area, tecnico, nombre_maquina, usuario, tipo_equipo, marca, modelo, serial,
-                     sistema_operativo, office, antivirus, compresor, control_remoto, activo_fijo, observaciones)
-                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''', datos)
+                     sistema_operativo, office, antivirus, compresor, control_remoto, activo_fijo, observaciones, ciclo_id)
+                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''', datos)
         conn.commit()
         flash('Registro guardado correctamente', 'success')
 
-    # Últimos registros
-    c.execute("SELECT * FROM mantenimiento ORDER BY id DESC LIMIT 10")
+    # Últimos registros — solo del ciclo activo si existe, sino últimos globales
+    if ciclo_activo:
+        c.execute("SELECT * FROM mantenimiento WHERE ciclo_id=%s ORDER BY id DESC LIMIT 10", (ciclo_activo['id'],))
+    else:
+        c.execute("SELECT * FROM mantenimiento ORDER BY id DESC LIMIT 10")
     registros = c.fetchall()
 
-    # Dashboard
-    c.execute("SELECT COUNT(*) AS total FROM mantenimiento")
-    total_mantenimientos = c.fetchone()['total']
+    # Dashboard: si hay ciclo activo, métricas por ciclo; si no, métricas globales
+    if ciclo_activo:
+        cid = ciclo_activo['id']
+        c.execute("SELECT COUNT(*) AS total FROM mantenimiento WHERE ciclo_id=%s", (cid,))
+        total_mantenimientos = c.fetchone()['total']
 
-    c.execute("SELECT COUNT(DISTINCT tecnico) AS total_tecnicos FROM mantenimiento")
-    total_tecnicos = c.fetchone()['total_tecnicos']
+        c.execute("SELECT COUNT(DISTINCT tecnico) AS total_tecnicos FROM mantenimiento WHERE ciclo_id=%s", (cid,))
+        total_tecnicos = c.fetchone()['total_tecnicos']
 
-    mes_actual = date.today().strftime("%Y-%m")
-    c.execute("SELECT COUNT(*) AS total_mes FROM mantenimiento WHERE fecha LIKE %s", (f"{mes_actual}%",))
-    mantenimientos_mes = c.fetchone()['total_mes']
+        # mantenimientos del mes (relativo al ciclo activo — simple aproximación por mes actual)
+        mes_actual = date.today().strftime("%Y-%m")
+        c.execute("SELECT COUNT(*) AS total_mes FROM mantenimiento WHERE ciclo_id=%s AND fecha LIKE %s", (cid, f"{mes_actual}%"))
+        mantenimientos_mes = c.fetchone()['total_mes']
 
-    c.execute("""SELECT tipo_equipo, COUNT(*) AS cantidad 
-                 FROM mantenimiento 
-                 GROUP BY tipo_equipo 
-                 ORDER BY cantidad DESC LIMIT 1""")
-    equipo_mas_comun = c.fetchone()
-    equipo_mas_comun = equipo_mas_comun['tipo_equipo'] if equipo_mas_comun else 'N/A'
+        c.execute("""SELECT tipo_equipo, COUNT(*) AS cantidad 
+                     FROM mantenimiento 
+                     WHERE ciclo_id=%s
+                     GROUP BY tipo_equipo 
+                     ORDER BY cantidad DESC LIMIT 1""", (cid,))
+        equipo_mas_comun = c.fetchone()
+        equipo_mas_comun = equipo_mas_comun['tipo_equipo'] if equipo_mas_comun else 'N/A'
 
-    c.execute("SELECT marca, COUNT(*) FROM mantenimiento GROUP BY marca ORDER BY COUNT(*) DESC LIMIT 6")
-    marcas_data = c.fetchall()
-    marca_labels = [r['marca'] for r in marcas_data]
-    marca_counts = [r['count'] for r in marcas_data]
-    marca_mas_comun = marcas_data[0]['marca'] if marcas_data else 'N/A'
+        c.execute("SELECT marca, COUNT(*) FROM mantenimiento WHERE ciclo_id=%s GROUP BY marca ORDER BY COUNT(*) DESC LIMIT 6", (cid,))
+        marcas_data = c.fetchall()
+        marca_labels = [r['marca'] for r in marcas_data]
+        marca_counts = [r['count'] for r in marcas_data]
+        marca_mas_comun = marcas_data[0]['marca'] if marcas_data else 'N/A'
 
-    c.execute("SELECT sede, COUNT(*) FROM mantenimiento GROUP BY sede ORDER BY sede")
-    sedes_data = c.fetchall()
-    sede_labels = [r['sede'] for r in sedes_data]
-    sede_counts = [r['count'] for r in sedes_data]
+        c.execute("SELECT sede, COUNT(*) FROM mantenimiento WHERE ciclo_id=%s GROUP BY sede ORDER BY sede", (cid,))
+        sedes_data = c.fetchall()
+        sede_labels = [r['sede'] for r in sedes_data]
+        sede_counts = [r['count'] for r in sedes_data]
 
-    c.execute("SELECT tipo_equipo, COUNT(*) FROM mantenimiento GROUP BY tipo_equipo")
-    equipos_data = c.fetchall()
-    equipo_labels = [r['tipo_equipo'] for r in equipos_data]
-    equipo_counts = [r['count'] for r in equipos_data]
+        c.execute("SELECT tipo_equipo, COUNT(*) FROM mantenimiento WHERE ciclo_id=%s GROUP BY tipo_equipo", (cid,))
+        equipos_data = c.fetchall()
+        equipo_labels = [r['tipo_equipo'] for r in equipos_data]
+        equipo_counts = [r['count'] for r in equipos_data]
 
-    c.execute("""SELECT TO_CHAR(TO_DATE(fecha, 'YYYY-MM-DD'), 'Mon') AS mes, COUNT(*) 
-                 FROM mantenimiento 
-                 WHERE fecha IS NOT NULL
-                 GROUP BY mes 
-                 ORDER BY MIN(fecha)""")
-    meses_data = c.fetchall()
-    meses_labels = [r['mes'] for r in meses_data]
-    meses_counts = [r['count'] for r in meses_data]
+        c.execute("""SELECT TO_CHAR(TO_DATE(fecha, 'YYYY-MM-DD'), 'Mon') AS mes, COUNT(*) 
+                     FROM mantenimiento 
+                     WHERE ciclo_id=%s AND fecha IS NOT NULL
+                     GROUP BY mes 
+                     ORDER BY MIN(fecha)""", (cid,))
+        meses_data = c.fetchall()
+        meses_labels = [r['mes'] for r in meses_data]
+        meses_counts = [r['count'] for r in meses_data]
+    else:
+        # comportamiento anterior (global)
+        c.execute("SELECT COUNT(*) AS total FROM mantenimiento")
+        total_mantenimientos = c.fetchone()['total']
+
+        c.execute("SELECT COUNT(DISTINCT tecnico) AS total_tecnicos FROM mantenimiento")
+        total_tecnicos = c.fetchone()['total_tecnicos']
+
+        mes_actual = date.today().strftime("%Y-%m")
+        c.execute("SELECT COUNT(*) AS total_mes FROM mantenimiento WHERE fecha LIKE %s", (f"{mes_actual}%",))
+        mantenimientos_mes = c.fetchone()['total_mes']
+
+        c.execute("""SELECT tipo_equipo, COUNT(*) AS cantidad 
+                     FROM mantenimiento 
+                     GROUP BY tipo_equipo 
+                     ORDER BY cantidad DESC LIMIT 1""")
+        equipo_mas_comun = c.fetchone()
+        equipo_mas_comun = equipo_mas_comun['tipo_equipo'] if equipo_mas_comun else 'N/A'
+
+        c.execute("SELECT marca, COUNT(*) FROM mantenimiento GROUP BY marca ORDER BY COUNT(*) DESC LIMIT 6")
+        marcas_data = c.fetchall()
+        marca_labels = [r['marca'] for r in marcas_data]
+        marca_counts = [r['count'] for r in marcas_data]
+        marca_mas_comun = marcas_data[0]['marca'] if marcas_data else 'N/A'
+
+        c.execute("SELECT sede, COUNT(*) FROM mantenimiento GROUP BY sede ORDER BY sede")
+        sedes_data = c.fetchall()
+        sede_labels = [r['sede'] for r in sedes_data]
+        sede_counts = [r['count'] for r in sedes_data]
+
+        c.execute("SELECT tipo_equipo, COUNT(*) FROM mantenimiento GROUP BY tipo_equipo")
+        equipos_data = c.fetchall()
+        equipo_labels = [r['tipo_equipo'] for r in equipos_data]
+        equipo_counts = [r['count'] for r in equipos_data]
+
+        c.execute("""SELECT TO_CHAR(TO_DATE(fecha, 'YYYY-MM-DD'), 'Mon') AS mes, COUNT(*) 
+                     FROM mantenimiento 
+                     WHERE fecha IS NOT NULL
+                     GROUP BY mes 
+                     ORDER BY MIN(fecha)""")
+        meses_data = c.fetchall()
+        meses_labels = [r['mes'] for r in meses_data]
+        meses_counts = [r['count'] for r in meses_data]
 
     conn.close()
 
@@ -530,6 +734,18 @@ def obtener_registro(rid):
     c = conn.cursor()
     c.execute("SELECT * FROM mantenimiento WHERE id=%s", (rid,))
     registro = c.fetchone()
+
+    # comprobar si registro pertenece a ciclo cerrado
+    if registro and registro.get('ciclo_id'):
+        c.execute("SELECT activo FROM ciclos WHERE id=%s", (registro['ciclo_id'],))
+        ciclo = c.fetchone()
+        # si ciclo no existe o está inactivo, consideramos cerrado
+        if not ciclo or not ciclo['activo']:
+            registro['cerrado'] = True
+        else:
+            # mantener la columna cerrado si está en DB
+            registro['cerrado'] = registro.get('cerrado', False)
+
     conn.close()
 
     if not registro:
@@ -544,6 +760,28 @@ def obtener_registro(rid):
 def actualizar_registro(rid):
     conn = get_db_connection()
     c = conn.cursor()
+    # verificar si el registro está marcado como cerrado
+    c.execute("SELECT ciclo_id, cerrado FROM mantenimiento WHERE id=%s", (rid,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        flash('Registro no encontrado', 'warning')
+        return redirect(url_for('principal'))
+
+    # Si el registro pertenece a un ciclo cerrado o su flag cerrado=True, bloquear edición
+    ciclo_id = row.get('ciclo_id')
+    if row.get('cerrado'):
+        conn.close()
+        flash('Este registro pertenece a un ciclo cerrado y no se puede modificar.', 'warning')
+        return redirect(url_for('principal'))
+    if ciclo_id:
+        c.execute("SELECT activo FROM ciclos WHERE id=%s", (ciclo_id,))
+        ciclo = c.fetchone()
+        if not ciclo or not ciclo['activo']:
+            conn.close()
+            flash('Este registro pertenece a un ciclo cerrado y no se puede modificar.', 'warning')
+            return redirect(url_for('principal'))
+
     campos = [
         'sede', 'fecha', 'area', 'nombre_maquina', 'usuario_equipo', 'tipo_equipo',
         'marca', 'modelo', 'serial', 'so', 'office', 'antivirus',
@@ -568,6 +806,27 @@ def actualizar_registro(rid):
 def eliminar(rid):
     conn = get_db_connection()
     c = conn.cursor()
+    # comprobar cerrado
+    c.execute("SELECT ciclo_id, cerrado FROM mantenimiento WHERE id=%s", (rid,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        flash('Registro no encontrado', 'warning')
+        return redirect(url_for('principal'))
+
+    if row.get('cerrado'):
+        conn.close()
+        flash('No se puede eliminar un registro de un ciclo cerrado.', 'warning')
+        return redirect(url_for('principal'))
+
+    if row.get('ciclo_id'):
+        c.execute("SELECT activo FROM ciclos WHERE id=%s", (row['ciclo_id'],))
+        ciclo = c.fetchone()
+        if not ciclo or not ciclo['activo']:
+            conn.close()
+            flash('No se puede eliminar un registro de un ciclo cerrado.', 'warning')
+            return redirect(url_for('principal'))
+
     c.execute("DELETE FROM mantenimiento WHERE id=%s", (rid,))
     conn.commit()
     conn.close()
