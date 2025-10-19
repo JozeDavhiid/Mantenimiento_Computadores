@@ -48,10 +48,13 @@ def get_db_connection():
 # -----------------------
 # Inicializar DB (asegura columnas/tabla reset)
 # -----------------------
-def init_db():
+ddef init_db():
     conn = get_db_connection()
     c = conn.cursor()
-    # Tabla mantenimiento (añadimos columnas ciclo_id y cerrado si no existen)
+
+    # ===========================
+    # Tabla mantenimiento
+    # ===========================
     c.execute('''CREATE TABLE IF NOT EXISTS mantenimiento (
                     id SERIAL PRIMARY KEY,
                     sede TEXT,
@@ -72,11 +75,14 @@ def init_db():
                     activo_fijo TEXT,
                     observaciones TEXT
                 )''')
-    # Añadir columna ciclo_id y cerrado si no existen
+
+    # Asegurar columnas nuevas en mantenimiento
     c.execute("ALTER TABLE mantenimiento ADD COLUMN IF NOT EXISTS ciclo_id INTEGER")
     c.execute("ALTER TABLE mantenimiento ADD COLUMN IF NOT EXISTS cerrado BOOLEAN DEFAULT FALSE")
 
-    # Tabla tecnicos (añadimos columna correo si no existe y rol)
+    # ===========================
+    # Tabla técnicos
+    # ===========================
     c.execute('''CREATE TABLE IF NOT EXISTS tecnicos (
                     id SERIAL PRIMARY KEY,
                     usuario TEXT UNIQUE,
@@ -85,7 +91,10 @@ def init_db():
                     contrasena TEXT,
                     rol TEXT DEFAULT 'tecnico'
                 )''')
-    # tabla para tokens de recuperación
+
+    # ===========================
+    # Tabla password_resets
+    # ===========================
     c.execute('''CREATE TABLE IF NOT EXISTS password_resets (
                     id SERIAL PRIMARY KEY,
                     usuario TEXT,
@@ -93,28 +102,51 @@ def init_db():
                     expires_at TIMESTAMP
                 )''')
 
-     # Tabla ciclos (para control trimestral)
+    # ===========================
+    # Tabla ciclos (para control trimestral)
+    # ===========================
     c.execute('''CREATE TABLE IF NOT EXISTS ciclos (
                     id SERIAL PRIMARY KEY,
-                    nombre TEXT,
-                    trimestre INTEGER,
-                    anio INTEGER,
-                    fecha_inicio DATE,
-                    fecha_cierre DATE,
-                    observaciones TEXT,
-                    activo BOOLEAN DEFAULT TRUE
+                    nombre TEXT
                 )''')
 
-    # Usuario admin por defecto
+    # 🔧 Verificar y agregar columnas faltantes en "ciclos"
+    c.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'ciclos'")
+    columnas_existentes = [r['column_name'] for r in c.fetchall()]
+
+    if 'trimestre' not in columnas_existentes:
+        c.execute("ALTER TABLE ciclos ADD COLUMN trimestre INTEGER")
+
+    if 'anio' not in columnas_existentes:
+        c.execute("ALTER TABLE ciclos ADD COLUMN anio INTEGER")
+
+    if 'fecha_inicio' not in columnas_existentes:
+        c.execute("ALTER TABLE ciclos ADD COLUMN fecha_inicio DATE")
+
+    if 'fecha_cierre' not in columnas_existentes:
+        c.execute("ALTER TABLE ciclos ADD COLUMN fecha_cierre DATE")
+
+    if 'observaciones' not in columnas_existentes:
+        c.execute("ALTER TABLE ciclos ADD COLUMN observaciones TEXT")
+
+    if 'activo' not in columnas_existentes:
+        c.execute("ALTER TABLE ciclos ADD COLUMN activo BOOLEAN DEFAULT TRUE")
+
+    # ===========================
+    # Usuario administrador por defecto
+    # ===========================
     c.execute("SELECT * FROM tecnicos WHERE usuario='admin'")
     if not c.fetchone():
-        c.execute("INSERT INTO tecnicos (usuario, nombre, correo, contrasena, rol) VALUES (%s,%s,%s,%s,%s)",
-                  ('admin', 'Administrador', 'admin@example.com', '1234', 'admin'))
+        c.execute("""
+            INSERT INTO tecnicos (usuario, nombre, correo, contrasena, rol)
+            VALUES (%s, %s, %s, %s, %s)
+        """, ('admin', 'Administrador', 'admin@example.com', '1234', 'admin'))
 
     conn.commit()
     conn.close()
 
 
+# Ejecutar al iniciar la app
 with app.app_context():
     init_db()
 
