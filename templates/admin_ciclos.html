@@ -5,8 +5,9 @@
 <div class="container mt-4">
     <h3 class="mb-4">📅 Administración de Ciclos Trimestrales</h3>
 
+    <!-- Formulario para crear nuevo ciclo -->
     <form method="POST" class="mb-4">
-        <div class="card p-3">
+        <div class="card p-3 shadow-sm">
             <h5>Crear nuevo ciclo</h5>
             <div class="row g-2">
                 <div class="col-md-3">
@@ -33,15 +34,19 @@
         </div>
     </form>
 
-    <form method="POST">
-        <button class="btn btn-warning mb-3" name="action" value="cerrar">
+    <!-- Botón para cerrar el ciclo activo -->
+    <form method="POST" class="mb-4">
+        <button class="btn btn-warning" name="action" value="cerrar" onclick="return confirm('¿Seguro que deseas cerrar el ciclo activo?');">
             🔒 Cerrar Ciclo Activo
         </button>
     </form>
 
-    <div class="card">
-        <div class="card-header bg-primary text-white">Historial de Ciclos</div>
-        <div class="card-body">
+    <!-- Tabla de ciclos existentes -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <strong>Historial de Ciclos</strong>
+        </div>
+        <div class="card-body table-responsive">
             <table class="table table-hover align-middle">
                 <thead>
                     <tr>
@@ -59,10 +64,10 @@
                     {% for c in ciclos %}
                     <tr>
                         <td>{{ c.id }}</td>
-                        <td>{{ c.nombre }}</td>
-                        <td>{{ c.trimestre }}</td>
-                        <td>{{ c.anio }}</td>
-                        <td>{{ c.fecha_inicio }}</td>
+                        <td>{{ c.nombre or '-' }}</td>
+                        <td>{{ c.trimestre or '-' }}</td>
+                        <td>{{ c.anio or '-' }}</td>
+                        <td>{{ c.fecha_inicio or '-' }}</td>
                         <td>{{ c.fecha_cierre or '-' }}</td>
                         <td>
                             {% if c.activo %}
@@ -71,15 +76,26 @@
                                 <span class="badge bg-secondary">Cerrado</span>
                             {% endif %}
                         </td>
-                        <td>
+                        <td class="text-nowrap">
+                            <!-- Ver ciclo -->
                             <a href="{{ url_for('ver_ciclo', ciclo_id=c.id) }}" class="btn btn-sm btn-info">
                                 👁️ Ver
                             </a>
+
+                            <!-- Asociar mantenimientos sin ciclo -->
+                            <form action="{{ url_for('asociar_mantenimientos_a_ciclo', ciclo_id=c.id) }}" method="POST" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-success"
+                                        onclick="return confirm('¿Asociar los mantenimientos sin ciclo a este ciclo?');">
+                                    🔗 Asociar
+                                </button>
+                            </form>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="8" class="text-center text-muted">No hay ciclos registrados</td>
+                        <td colspan="8" class="text-center text-muted">
+                            No hay ciclos registrados
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
