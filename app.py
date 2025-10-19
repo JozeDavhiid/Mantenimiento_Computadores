@@ -48,7 +48,7 @@ def get_db_connection():
 # -----------------------
 # Inicializar DB (asegura columnas/tabla reset)
 # -----------------------
-ddef init_db():
+def init_db():
     conn = get_db_connection()
     c = conn.cursor()
 
