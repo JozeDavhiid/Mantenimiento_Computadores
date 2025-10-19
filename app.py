@@ -965,6 +965,73 @@ def acta_pdf(rid):
                      download_name=f"Acta_Registro_{registro['id']}.pdf",
                      mimetype='application/pdf')
 
+# ============================================================
+# ADMINISTRACIÓN DE CICLOS TRIMESTRALES
+# ============================================================
+@app.route('/admin_ciclos', methods=['GET', 'POST'])
+@admin_required
+def admin_ciclos():
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    # Crear nuevo ciclo
+    if request.method == 'POST' and request.form.get('action') == 'nuevo':
+        # Cerrar ciclo anterior si existe
+        c.execute("UPDATE ciclos SET activo=FALSE, fecha_cierre=%s WHERE activo=TRUE", (date.today(),))
+
+        nombre = request.form.get('nombre', f"Ciclo {date.today().strftime('%b %Y')}")
+        trimestre = request.form.get('trimestre', 1)
+        anio = request.form.get('anio', date.today().year)
+        fecha_inicio = request.form.get('fecha_inicio', date.today())
+        observaciones = request.form.get('observaciones', '')
+
+        c.execute("""INSERT INTO ciclos (nombre, trimestre, anio, fecha_inicio, observaciones, activo)
+                     VALUES (%s, %s, %s, %s, %s, TRUE)""",
+                  (nombre, trimestre, anio, fecha_inicio, observaciones))
+        conn.commit()
+        flash('✅ Nuevo ciclo creado correctamente', 'success')
+        conn.close()
+        return redirect(url_for('admin_ciclos'))
+
+    # Cerrar ciclo activo
+    if request.method == 'POST' and request.form.get('action') == 'cerrar':
+        c.execute("SELECT id FROM ciclos WHERE activo=TRUE ORDER BY id DESC LIMIT 1")
+        ciclo_activo = c.fetchone()
+        if ciclo_activo:
+            c.execute("UPDATE ciclos SET activo=FALSE, fecha_cierre=%s WHERE id=%s", (date.today(), ciclo_activo['id']))
+            c.execute("UPDATE mantenimiento SET cerrado=TRUE WHERE ciclo_id=%s", (ciclo_activo['id'],))
+            conn.commit()
+            flash('🔒 Ciclo cerrado exitosamente', 'info')
+        else:
+            flash('No hay ciclo activo para cerrar', 'warning')
+        conn.close()
+        return redirect(url_for('admin_ciclos'))
+
+    # Mostrar todos los ciclos
+    c.execute("SELECT * FROM ciclos ORDER BY id DESC")
+    ciclos = c.fetchall()
+    conn.close()
+    return render_template('admin_ciclos.html', ciclos=ciclos)
+
+
+@app.route('/ver_ciclo/<int:ciclo_id>')
+@admin_required
+def ver_ciclo(ciclo_id):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM ciclos WHERE id=%s", (ciclo_id,))
+    ciclo = c.fetchone()
+
+    c.execute("SELECT * FROM mantenimiento WHERE ciclo_id=%s ORDER BY fecha ASC", (ciclo_id,))
+    registros = c.fetchall()
+    conn.close()
+
+    if not ciclo:
+        flash('Ciclo no encontrado', 'warning')
+        return redirect(url_for('admin_ciclos'))
+
+    return render_template('ver_ciclo.html', ciclo=ciclo, registros=registros)
+
 
 # -----------------------
 # Main
