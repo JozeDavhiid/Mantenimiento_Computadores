@@ -142,9 +142,32 @@ def init_db():
             VALUES (%s, %s, %s, %s, %s)
         """, ('admin', 'Administrador', 'admin@example.com', '1234', 'admin'))
 
+    # ===========================
+    # Crear ciclo del 11/08/2025 al 09/10/2025
+    # ===========================
+    c.execute("""
+        SELECT id FROM ciclos 
+        WHERE fecha_inicio = %s AND fecha_cierre = %s
+    """, ('2025-08-11', '2025-10-09'))
+    ciclo_existente = c.fetchone()
+
+    if not ciclo_existente:
+        c.execute("""
+            INSERT INTO ciclos (nombre, trimestre, anio, fecha_inicio, fecha_cierre, observaciones, activo)
+            VALUES (%s, %s, %s, %s, %s, %s, FALSE)
+            RETURNING id
+        """, ('Ciclo Ago-Oct 2025', 3, 2025, '2025-08-11', '2025-10-09', 'Ciclo previo a la implementación de control trimestral'))
+        ciclo_id = c.fetchone()['id']
+    else:
+        ciclo_id = ciclo_existente['id']
+
+    # ===========================
+    # Asociar registros antiguos a este ciclo
+    # ===========================
+    c.execute("UPDATE mantenimiento SET ciclo_id = %s WHERE ciclo_id IS NULL", (ciclo_id,))
+
     conn.commit()
     conn.close()
-
 
 # Ejecutar al iniciar la app
 with app.app_context():
