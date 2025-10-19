@@ -3,6 +3,21 @@
 
 {% block content %}
 <div class="container mt-4">
+
+    <!-- Mostrar mensajes flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mt-2">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
     <h3 class="mb-4">📅 Administración de Ciclos Trimestrales</h3>
 
     <!-- Formulario para crear nuevo ciclo -->
@@ -36,7 +51,8 @@
 
     <!-- Botón para cerrar el ciclo activo -->
     <form method="POST" class="mb-4">
-        <button class="btn btn-warning" name="action" value="cerrar" onclick="return confirm('¿Seguro que deseas cerrar el ciclo activo?');">
+        <button class="btn btn-warning" name="action" value="cerrar"
+                onclick="return confirm('¿Seguro que deseas cerrar el ciclo activo?');">
             🔒 Cerrar Ciclo Activo
         </button>
     </form>
@@ -62,7 +78,7 @@
                 </thead>
                 <tbody>
                     {% for c in ciclos %}
-                    <tr>
+                    <tr class="{% if c.activo %}table-success{% endif %}">
                         <td>{{ c.id }}</td>
                         <td>{{ c.nombre or '-' }}</td>
                         <td>{{ c.trimestre or '-' }}</td>
@@ -77,12 +93,9 @@
                             {% endif %}
                         </td>
                         <td class="text-nowrap">
-                            <!-- Ver ciclo -->
                             <a href="{{ url_for('ver_ciclo', ciclo_id=c.id) }}" class="btn btn-sm btn-info">
                                 👁️ Ver
                             </a>
-
-                            <!-- Asociar mantenimientos sin ciclo -->
                             <form action="{{ url_for('asociar_mantenimientos_a_ciclo', ciclo_id=c.id) }}" method="POST" class="d-inline">
                                 <button type="submit" class="btn btn-sm btn-outline-success"
                                         onclick="return confirm('¿Asociar los mantenimientos sin ciclo a este ciclo?');">

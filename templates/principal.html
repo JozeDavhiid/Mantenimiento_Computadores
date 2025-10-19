@@ -3,51 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <title>Panel Principal - Mantenimiento</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
-    body {
-        background-color: #f8f9fa;
-    }
-
-    .chart-container {
-        position: relative;
-        height: 320px;
-    }
-
-    .chart-large {
-        height: 400px !important;
-    }
-
-    .card {
-        border: none;
-        border-radius: 12px;
-    }
-
-    .card-header {
-        border-top-left-radius: 12px;
-        border-top-right-radius: 12px;
-    }
-
-    .card-footer {
-        background-color: #f8f9fa;
-    }
-
-    table th {
-        cursor: pointer;
+    body { background-color: #f8f9fa; }
+    .chart-container { position: relative; height: 320px; }
+    .chart-large { height: 400px !important; }
+    .card { border: none; border-radius: 12px; }
+    .card-header { border-top-left-radius: 12px; border-top-right-radius: 12px; }
+    .card-footer { background-color: #f8f9fa; }
+    table th { cursor: pointer; }
+    .badge-inline { margin-right: 6px; }
+    @media (max-width: 767px) {
+      .chart-container { height: 260px; }
+      .chart-large { height: 300px !important; }
     }
   </style>
 </head>
 <body>
 
-<!-- ===================== -->
 <!-- NAVBAR -->
-<!-- ===================== -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
   <div class="container-fluid">
-    <a class="navbar-brand fw-bold" href="#">🖥️ Mantenimiento</a>
-    <div class="d-flex">
-      <span class="navbar-text text-white me-3">👋 Hola, {{ rol }} {{ nombre }}</span>
+    <a class="navbar-brand fw-bold" href="{{ url_for('principal') }}">🖥️ Mantenimiento</a>
+    <div class="d-flex align-items-center">
+      <div class="me-3 text-white small">👋 {{ nombre or '' }} <span class="text-muted">({{ rol }})</span></div>
       <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">Cerrar sesión</a>
     </div>
   </div>
@@ -65,9 +46,38 @@
     {% endif %}
   {% endwith %}
 
-  <!-- ===================== -->
+  <!-- CICLO ACTIVO -->
+  {% if ciclo_activo %}
+  <div class="alert alert-success d-flex justify-content-between align-items-center shadow-sm">
+    <div>
+      <strong>📅 Ciclo activo:</strong>
+      {{ ciclo_activo.nombre or 'Sin nombre' }}
+      — Trimestre {{ ciclo_activo.trimestre or '—' }} ({{ ciclo_activo.anio or '—' }})
+      <br>
+      <small>Inicio: {{ ciclo_activo.fecha_inicio or '—' }} | Cierre: {{ ciclo_activo.fecha_cierre or '—' }}</small>
+    </div>
+    <div class="d-flex gap-2">
+      {% if rol == 'admin' %}
+        <a href="{{ url_for('admin_ciclos') }}" class="btn btn-outline-light btn-sm">⚙️ Administrar Ciclos</a>
+      {% endif %}
+      <a href="{{ url_for('consultar') }}" class="btn btn-light btn-sm">🔎 Ver Registros</a>
+    </div>
+  </div>
+  {% else %}
+  <div class="alert alert-warning d-flex justify-content-between align-items-center shadow-sm">
+    <div>
+      ⚠️ <strong>No hay un ciclo activo.</strong>
+      <div class="small">Para registrar mantenimientos, un administrador debe activar un ciclo.</div>
+    </div>
+    <div>
+      {% if rol == 'admin' %}
+      <a href="{{ url_for('admin_ciclos') }}" class="btn btn-dark btn-sm">➕ Crear / Activar Ciclo</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
   <!-- FORMULARIO DE REGISTRO -->
-  <!-- ===================== -->
   <div class="card shadow mb-4">
     <div class="card-header bg-primary text-white fw-bold">Registrar Nuevo Mantenimiento</div>
     <div class="card-body">
@@ -75,7 +85,7 @@
         <input type="hidden" name="action" value="guardar">
 
         <div class="col-md-3">
-          <label>Sede</label>
+          <label class="form-label">Sede</label>
           <select name="sede" class="form-select">
             <option>Nivel Central</option>
             <option>Barranquilla</option>
@@ -91,27 +101,27 @@
         </div>
 
         <div class="col-md-3">
-          <label>Fecha</label>
+          <label class="form-label">Fecha</label>
           <input type="date" name="fecha" class="form-control" value="{{ hoy }}">
         </div>
 
         <div class="col-md-3">
-          <label>Área</label>
+          <label class="form-label">Área</label>
           <input type="text" name="area" class="form-control">
         </div>
 
         <div class="col-md-3">
-          <label>Nombre Máquina</label>
+          <label class="form-label">Nombre Máquina</label>
           <input type="text" name="nombre_maquina" class="form-control" required>
         </div>
 
         <div class="col-md-3">
-          <label>Usuario Equipo</label>
+          <label class="form-label">Usuario Equipo</label>
           <input type="text" name="usuario_equipo" class="form-control">
         </div>
 
         <div class="col-md-3">
-          <label>Tipo de Equipo</label>
+          <label class="form-label">Tipo de Equipo</label>
           <select name="tipo_equipo" class="form-select">
             <option>Portátil</option>
             <option>All in One</option>
@@ -123,22 +133,22 @@
         </div>
 
         <div class="col-md-3">
-          <label>Marca</label>
+          <label class="form-label">Marca</label>
           <input type="text" name="marca" class="form-control">
         </div>
 
         <div class="col-md-3">
-          <label>Modelo</label>
+          <label class="form-label">Modelo</label>
           <input type="text" name="modelo" class="form-control">
         </div>
 
         <div class="col-md-3">
-          <label>Serial</label>
+          <label class="form-label">Serial</label>
           <input type="text" name="serial" class="form-control">
         </div>
 
         <div class="col-md-3">
-          <label>Sistema Operativo</label>
+          <label class="form-label">Sistema Operativo</label>
           <select name="so" class="form-select">
             <option>Windows 10 Pro 22H2</option>
             <option>Windows 11 Pro 23H2</option>
@@ -152,7 +162,7 @@
         </div>
 
         <div class="col-md-3">
-          <label>Office</label>
+          <label class="form-label">Office</label>
           <select name="office" class="form-select">
             <option>Microsoft Office 2013</option>
             <option>Microsoft Office 2019</option>
@@ -164,7 +174,7 @@
         </div>
 
         <div class="col-md-3">
-          <label>Antivirus</label>
+          <label class="form-label">Antivirus</label>
           <select name="antivirus" class="form-select">
             <option>Kaspersky Endpoint</option>
             <option>Windows Defender</option>
@@ -175,7 +185,7 @@
         </div>
 
         <div class="col-md-3">
-          <label>Compresor</label>
+          <label class="form-label">Compresor</label>
           <select name="compresor" class="form-select">
             <option>WinRAR</option>
             <option>7-Zip</option>
@@ -185,7 +195,7 @@
         </div>
 
         <div class="col-md-3">
-          <label>Control Remoto</label>
+          <label class="form-label">Control Remoto</label>
           <select name="control_remoto" class="form-select">
             <option>AnyDesk</option>
             <option>RustDesk</option>
@@ -196,30 +206,29 @@
         </div>
 
         <div class="col-md-3">
-          <label>Activo Fijo</label>
+          <label class="form-label">Activo Fijo</label>
           <input type="text" name="activo_fijo" class="form-control">
         </div>
 
         <div class="col-12">
-          <label>Observaciones</label>
+          <label class="form-label">Observaciones</label>
           <textarea name="observaciones" class="form-control" rows="4"></textarea>
         </div>
 
-        <div class="d-flex justify-content-start gap-2 mt-3">
+        <div class="d-flex justify-content-start gap-2 mt-3 col-12">
           <button type="submit" class="btn btn-primary">Guardar</button>
           <a href="{{ url_for('consultar') }}" class="btn btn-info" target="_blank">Consultar Registros</a>
           {% if rol == 'admin' %}
             <a href="{{ url_for('registro') }}" class="btn btn-secondary">Registrar Técnico</a>
             <a href="{{ url_for('exportar') }}" class="btn btn-success">Exportar Excel</a>
+            <a href="{{ url_for('admin_ciclos') }}" class="btn btn-dark">⚙️ Ciclos</a>
           {% endif %}
         </div>
       </form>
     </div>
   </div>
 
-  <!-- ===================== -->
   <!-- DASHBOARD -->
-  <!-- ===================== -->
   <div class="container-fluid mt-5">
     <h3 class="text-center mb-4 fw-bold">📊 Dashboard de Estadísticas</h3>
 
@@ -259,7 +268,6 @@
     </div>
 
     <div class="row">
-      <!-- === Mantenimientos por Sede === -->
       <div class="col-md-6 mb-4">
         <div class="card shadow">
           <div class="card-header bg-primary text-white fw-bold">Mantenimientos por Sede</div>
@@ -269,7 +277,6 @@
         </div>
       </div>
 
-      <!-- === Tendencia Mensual === -->
       <div class="col-md-6 mb-4">
         <div class="card shadow">
           <div class="card-header bg-warning text-white fw-bold">Tendencia Mensual</div>
@@ -279,7 +286,6 @@
         </div>
       </div>
 
-      <!-- === Tipos de Equipos === -->
       <div class="col-md-6 mb-4">
         <div class="card shadow">
           <div class="card-header bg-success text-white fw-bold">Tipos de Equipos</div>
@@ -292,7 +298,6 @@
         </div>
       </div>
 
-      <!-- === Marcas Más Comunes === -->
       <div class="col-md-6 mb-4">
         <div class="card shadow">
           <div class="card-header bg-info text-white fw-bold">Marcas Más Comunes</div>
@@ -307,119 +312,134 @@
     </div>
   </div>
 
-  <!-- ===================== -->
   <!-- TABLA DE REGISTROS -->
-  <!-- ===================== -->
   <div class="card shadow mt-5">
     <div class="card-header bg-dark text-white fw-bold">Últimos Registros</div>
     <div class="card-body">
-      <table class="table table-striped table-hover align-middle" id="tablaRegistros">
-        <thead class="table-dark">
-          <tr>
-            <th>ID</th>
-            <th>Sede</th>
-            <th>Fecha</th>
-            <th>Técnico</th>
-            <th>Equipo</th>
-            <th>Usuario</th>
-            <th>Marca</th>
-            <th>Modelo</th>
-            <th>Serial</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in registros %}
-          <tr>
-            <td>{{ r.id }}</td>
-            <td>{{ r.sede }}</td>
-            <td>{{ r.fecha }}</td>
-            <td>{{ r.tecnico }}</td>
-            <td>{{ r.tipo_equipo }}</td>
-            <td>{{ r.usuario }}</td>
-            <td>{{ r.marca }}</td>
-            <td>{{ r.modelo }}</td>
-            <td>{{ r.serial }}</td>
-            <td>
-              <div class="d-flex gap-2">
-                <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-warning btn-sm">Editar</a>
-                <a href="{{ url_for('acta_pdf', rid=r.id) }}" class="btn btn-success btn-sm">Acta</a>
-                {% if rol == 'admin' %}
-                  <form action="{{ url_for('eliminar', rid=r.id) }}" method="POST" 
-                        onsubmit="return confirm('¿Seguro que deseas eliminar este registro?');" class="m-0 p-0">
-                    <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
-                  </form>
-                {% endif %}
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle" id="tablaRegistros">
+          <thead class="table-dark">
+            <tr>
+              <th>ID</th>
+              <th>Sede</th>
+              <th>Fecha</th>
+              <th>Técnico</th>
+              <th>Equipo</th>
+              <th>Usuario</th>
+              <th>Marca</th>
+              <th>Modelo</th>
+              <th>Serial</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in registros %}
+            <tr>
+              <td>{{ r.id }}</td>
+              <td>{{ r.sede }}</td>
+              <td>{{ r.fecha }}</td>
+              <td>{{ r.tecnico }}</td>
+              <td>{{ r.tipo_equipo }}</td>
+              <td>{{ r.usuario }}</td>
+              <td>{{ r.marca }}</td>
+              <td>{{ r.modelo }}</td>
+              <td>{{ r.serial }}</td>
+              <td>
+                <div class="d-flex gap-2">
+                  <a href="{{ url_for('obtener_registro', rid=r.id) }}" class="btn btn-warning btn-sm">Editar</a>
+                  <a href="{{ url_for('acta_pdf', rid=r.id) }}" class="btn btn-success btn-sm">Acta</a>
+                  {% if rol == 'admin' %}
+                    <form action="{{ url_for('eliminar', rid=r.id) }}" method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar este registro?');" class="m-0 p-0">
+                      <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- ===================== -->
-<!-- JS -->
-<!-- ===================== -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // === Chart.js ===
-  new Chart(document.getElementById('chartSedes'), {
-    type: 'bar',
-    data: {
-      labels: {{ sede_labels|tojson }},
-      datasets: [{ label: 'Mantenimientos', data: {{ sede_counts|tojson }}, backgroundColor: '#007bff' }]
-    },
-    options: { responsive: true, plugins: { legend: { display: false } } }
-  });
+  // Charts data — estas variables vienen desde Flask
+  const sedeLabels = {{ sede_labels|tojson }};
+  const sedeCounts = {{ sede_counts|tojson }};
+  const equipoLabels = {{ equipo_labels|tojson }};
+  const equipoCounts = {{ equipo_counts|tojson }};
+  const mesesLabels = {{ meses_labels|tojson }};
+  const mesesCounts = {{ meses_counts|tojson }};
+  const marcaLabels = {{ marca_labels|tojson }};
+  const marcaCounts = {{ marca_counts|tojson }};
 
-  new Chart(document.getElementById('chartEquipos'), {
-    type: 'pie',
-    data: {
-      labels: {{ equipo_labels|tojson }},
-      datasets: [{ data: {{ equipo_counts|tojson }}, backgroundColor: ['#28a745','#ffc107','#17a2b8','#6f42c1','#dc3545','#20c997'] }]
-    },
-    options: { responsive: true }
-  });
+  // Chart: Sedes (bar)
+  const ctxSedes = document.getElementById('chartSedes');
+  if (ctxSedes) {
+    new Chart(ctxSedes, {
+      type: 'bar',
+      data: {
+        labels: sedeLabels,
+        datasets: [{ label: 'Mantenimientos', data: sedeCounts }]
+      },
+      options: { responsive: true, plugins: { legend: { display: false } } }
+    });
+  }
 
-  new Chart(document.getElementById('chartMeses'), {
-    type: 'line',
-    data: {
-      labels: {{ meses_labels|tojson }},
-      datasets: [{ label: 'Mantenimientos', data: {{ meses_counts|tojson }}, borderColor: '#ffc107', fill: true }]
-    },
-    options: { responsive: true }
-  });
+  // Chart: Equipos (pie)
+  const ctxEquipos = document.getElementById('chartEquipos');
+  if (ctxEquipos) {
+    new Chart(ctxEquipos, {
+      type: 'pie',
+      data: {
+        labels: equipoLabels,
+        datasets: [{ data: equipoCounts }]
+      },
+      options: { responsive: true }
+    });
+  }
 
-  new Chart(document.getElementById('chartMarcas'), {
-    type: 'bar',
-    data: {
-      labels: {{ marca_labels|tojson }},
-      datasets: [{
-        label: 'Cantidad por Marca',
-        data: {{ marca_counts|tojson }},
-        backgroundColor: ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6f42c1', '#20c997']
-      }]
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true,
-      scales: { x: { beginAtZero: true } },
-      plugins: { legend: { display: false } }
-    }
-  });
+  // Chart: Meses (line)
+  const ctxMeses = document.getElementById('chartMeses');
+  if (ctxMeses) {
+    new Chart(ctxMeses, {
+      type: 'line',
+      data: {
+        labels: mesesLabels,
+        datasets: [{ label: 'Mantenimientos', data: mesesCounts, tension: 0.3, fill: true }]
+      },
+      options: { responsive: true }
+    });
+  }
 
-  // === Mayúsculas automáticas ===
+  // Chart: Marcas (horizontal bar)
+  const ctxMarcas = document.getElementById('chartMarcas');
+  if (ctxMarcas) {
+    new Chart(ctxMarcas, {
+      type: 'bar',
+      data: {
+        labels: marcaLabels,
+        datasets: [{ label: 'Cantidad por Marca', data: marcaCounts }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        scales: { x: { beginAtZero: true } },
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+
+  // Auto uppercase fields
   const campos = ['nombre_maquina', 'marca', 'modelo', 'serial'];
   campos.forEach(nombre => {
     const input = document.querySelector(`[name="${nombre}"]`);
-    if (input) input.addEventListener('input', function() {
-      this.value = this.value.toUpperCase();
-    });
+    if (input) input.addEventListener('input', function() { this.value = this.value.toUpperCase(); });
   });
 });
 </script>
