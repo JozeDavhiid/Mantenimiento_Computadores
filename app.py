@@ -463,67 +463,6 @@ def recuperar_confirm():
     conn.close()
     return render_template('recuperar_confirm.html', token=token)
 
-
-# -----------------------
-# Administración de ciclos (nueva página /admin/ciclos)
-# -----------------------
-@app.route('/admin/ciclos', methods=['GET', 'POST'])
-@admin_required
-def admin_ciclos():
-    """
-    GET: muestra la lista de ciclos y el ciclo activo
-    POST: crea un nuevo ciclo (solo si no hay ciclo activo)
-    """
-    conn = get_db_connection()
-    c = conn.cursor()
-
-    if request.method == 'POST':
-        # crear nuevo ciclo
-        nombre = request.form.get('nombre', '').strip()
-        trimestre = int(request.form.get('trimestre', 0))
-        anio = int(request.form.get('anio', date.today().year))
-        fecha_inicio = request.form.get('fecha_inicio') or None
-        observaciones = request.form.get('observaciones', '').strip()
-
-        # Validaciones básicas
-        if not nombre or trimestre not in (1, 2, 3, 4):
-            flash('Nombre y trimestre (1-4) son obligatorios', 'warning')
-            conn.close()
-            return redirect(url_for('admin_ciclos'))
-
-        # impedir crear si ya hay un ciclo activo
-        c.execute("SELECT COUNT(*) AS cnt FROM ciclos WHERE activo=TRUE")
-        if c.fetchone()['cnt'] > 0:
-            flash('Ya existe un ciclo activo. Cierra el ciclo activo antes de crear uno nuevo.', 'warning')
-            conn.close()
-            return redirect(url_for('admin_ciclos'))
-
-        try:
-            c.execute("""INSERT INTO ciclos (nombre, trimestre, anio, fecha_inicio, observaciones, activo)
-                         VALUES (%s,%s,%s,%s,%s,TRUE)""",
-                      (nombre, trimestre, anio, fecha_inicio, observaciones))
-            conn.commit()
-            flash('Ciclo creado y activado correctamente', 'success')
-        except Exception:
-            conn.rollback()
-            app.logger.exception("Error creando ciclo")
-            flash('Error creando ciclo', 'danger')
-        finally:
-            # seguir para mostrar la lista
-            pass
-
-    # listar ciclos (más reciente primero)
-    c.execute("SELECT * FROM ciclos ORDER BY creado_en DESC")
-    ciclos = c.fetchall()
-
-    # ciclo activo (si existe)
-    c.execute("SELECT * FROM ciclos WHERE activo=TRUE ORDER BY id DESC LIMIT 1")
-    activo = c.fetchone()
-
-    conn.close()
-    return render_template('admin_ciclos.html', ciclos=ciclos, activo=activo)
-
-
 @app.route('/admin/ciclos/cerrar/<int:cid>', methods=['POST'])
 @admin_required
 def cerrar_ciclo(cid):
@@ -1032,6 +971,37 @@ def ver_ciclo(ciclo_id):
 
     return render_template('ver_ciclo.html', ciclo=ciclo, registros=registros)
 
+@app.route('/admin/ciclos/asociar/<int:ciclo_id>', methods=['POST'])
+@admin_required
+def asociar_mantenimientos_a_ciclo(ciclo_id):
+    """Asocia todos los mantenimientos sin ciclo al ciclo especificado."""
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    # Verificar si el ciclo existe
+    c.execute("SELECT * FROM ciclos WHERE id=%s", (ciclo_id,))
+    ciclo = c.fetchone()
+    if not ciclo:
+        conn.close()
+        flash("❌ El ciclo seleccionado no existe.", "danger")
+        return redirect(url_for('admin_ciclos'))
+
+    # Contar mantenimientos sin ciclo
+    c.execute("SELECT COUNT(*) FROM mantenimiento WHERE ciclo_id IS NULL")
+    total_sin_ciclo = c.fetchone()['count']
+
+    if total_sin_ciclo == 0:
+        conn.close()
+        flash("✅ No hay mantenimientos pendientes por asociar.", "info")
+        return redirect(url_for('admin_ciclos'))
+
+    # Actualizar mantenimientos sin ciclo
+    c.execute("UPDATE mantenimiento SET ciclo_id=%s WHERE ciclo_id IS NULL", (ciclo_id,))
+    conn.commit()
+    conn.close()
+
+    flash(f"🧾 {total_sin_ciclo} mantenimientos fueron asociados al ciclo '{ciclo['nombre']}'.", "success")
+    return redirect(url_for('admin_ciclos'))
 
 # -----------------------
 # Main
