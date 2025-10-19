@@ -5,8 +5,12 @@ from datetime import datetime, timedelta, date
 from functools import wraps
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
-import psycopg2
-from psycopg2.extras import RealDictCursor
+
+# psycopg3
+import psycopg
+from psycopg.rows import dict_row
+from psycopg import errors as psycopg_errors
+
 import openpyxl
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
@@ -32,10 +36,12 @@ app.secret_key = SECRET_KEY
 
 
 # -----------------------
-# Función conexión DB
+# Función conexión DB (psycopg3) - devuelve conexión con row_factory dict_row
 # -----------------------
 def get_db_connection():
-    conn = psycopg2.connect(DB_URL, cursor_factory=RealDictCursor)
+    # psycopg.connect soporta URL de conexión PostgreSQL
+    # usamos row_factory=dict_row para que fetchone/fetchall devuelvan dicts
+    conn = psycopg.connect(DB_URL, autocommit=False, row_factory=dict_row)
     return conn
 
 
@@ -142,7 +148,7 @@ def send_email(to_email: str, subject: str, body: str):
         resp = sg.send(message)
         app.logger.info(f"SendGrid response: {resp.status_code}")
         return resp.status_code
-    except Exception as e:
+    except Exception:
         app.logger.exception("Error enviando correo con SendGrid")
         raise
 
@@ -208,9 +214,13 @@ def registro():
             conn.commit()
             flash('Técnico registrado correctamente', 'success')
             return redirect(url_for('principal'))
-        except psycopg2.IntegrityError:
+        except psycopg_errors.UniqueViolation:
             conn.rollback()
             flash('El usuario o correo ya existe', 'warning')
+        except Exception:
+            conn.rollback()
+            app.logger.exception("Error registrando técnico")
+            flash('Error al registrar técnico', 'danger')
         finally:
             conn.close()
     return render_template('registro.html')
@@ -245,9 +255,16 @@ def recuperar():
         correo = row['correo']
         token = secrets.token_urlsafe(32)
         expires_at = datetime.utcnow() + timedelta(hours=1)
-        c.execute("INSERT INTO password_resets (usuario, token, expires_at) VALUES (%s,%s,%s)",
-                  (usuario, token, expires_at))
-        conn.commit()
+        try:
+            c.execute("INSERT INTO password_resets (usuario, token, expires_at) VALUES (%s,%s,%s)",
+                      (usuario, token, expires_at))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            app.logger.exception("Error guardando token de recuperación")
+            flash('Error interno, intenta de nuevo', 'danger')
+            conn.close()
+            return redirect(url_for('recuperar'))
         conn.close()
 
         base = request.host_url.rstrip('/')
@@ -316,10 +333,16 @@ def recuperar_confirm():
             return redirect(url_for('recuperar_confirm') + f"?token={token}")
 
         usuario = row['usuario']
-        # actualizar contraseña en texto plano (según petición)
-        c.execute("UPDATE tecnicos SET contrasena=%s WHERE usuario=%s", (nueva, usuario))
-        c.execute("DELETE FROM password_resets WHERE token=%s", (token,))
-        conn.commit()
+        try:
+            c.execute("UPDATE tecnicos SET contrasena=%s WHERE usuario=%s", (nueva, usuario))
+            c.execute("DELETE FROM password_resets WHERE token=%s", (token,))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            app.logger.exception("Error actualizando contraseña")
+            flash('Error interno, intenta de nuevo', 'danger')
+            conn.close()
+            return redirect(url_for('recuperar'))
         conn.close()
         flash('Contraseña actualizada correctamente ✅', 'success')
         return redirect(url_for('login'))
@@ -582,20 +605,30 @@ def acta_pdf(rid):
     buffer = BytesIO()
     c_pdf = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
+
+    # Encabezado más profesional
+    c_pdf.setFont("Helvetica-Bold", 16)
+    c_pdf.drawString(50, height - 50, "ACTA DE MANTENIMIENTO")
+    c_pdf.setFont("Helvetica", 10)
+    c_pdf.drawString(50, height - 70, f"ID: {registro['id']}    Fecha generación: {date.today().isoformat()}")
+    c_pdf.line(50, height - 75, width - 50, height - 75)
+
+    y = height - 95
     c_pdf.setFont("Helvetica", 12)
-    y = height - 50
-    c_pdf.drawString(50, y, f"Acta de Mantenimiento - ID: {registro['id']}")
-    y -= 25
 
     for k, v in registro.items():
         texto = f"{k.replace('_',' ').title()}: {v}"
+        # rompemos en líneas de 100 caracteres para evitar desbordes
         for linea in [texto[i:i+100] for i in range(0, len(texto), 100)]:
             c_pdf.drawString(50, y, linea)
             y -= 15
             if y < 50:
                 c_pdf.showPage()
+                # reproducir encabezado reducido en nueva página
+                c_pdf.setFont("Helvetica-Bold", 14)
+                c_pdf.drawString(50, height - 40, "ACTA DE MANTENIMIENTO (continuación)")
                 c_pdf.setFont("Helvetica", 12)
-                y = height - 50
+                y = height - 70
 
     c_pdf.save()
     buffer.seek(0)
