@@ -93,7 +93,7 @@ def init_db():
                     expires_at TIMESTAMP
                 )''')
 
-    # tabla ciclos para gestionar periodos trimestrales
+     # Tabla ciclos (para control trimestral)
     c.execute('''CREATE TABLE IF NOT EXISTS ciclos (
                     id SERIAL PRIMARY KEY,
                     nombre TEXT,
@@ -101,17 +101,16 @@ def init_db():
                     anio INTEGER,
                     fecha_inicio DATE,
                     fecha_cierre DATE,
-                    activo BOOLEAN DEFAULT FALSE,
                     observaciones TEXT,
-                    creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    activo BOOLEAN DEFAULT TRUE
                 )''')
 
-    # Usuario admin por defecto (si no existe)
+    # Usuario admin por defecto
     c.execute("SELECT * FROM tecnicos WHERE usuario='admin'")
     if not c.fetchone():
-        # contraseña en texto plano por compatibilidad (puedes cambiarla luego)
         c.execute("INSERT INTO tecnicos (usuario, nombre, correo, contrasena, rol) VALUES (%s,%s,%s,%s,%s)",
                   ('admin', 'Administrador', 'admin@example.com', '1234', 'admin'))
+
     conn.commit()
     conn.close()
 
