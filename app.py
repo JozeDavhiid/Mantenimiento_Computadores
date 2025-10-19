@@ -128,10 +128,11 @@ def admin_required(f):
 # -----------------------
 # Util: enviar correo mediante SendGrid API
 # -----------------------
-def send_email(to_email: str, subject: str, body: str):
+def send_email(to_email: str, subject: str, body: str, html_content: str = None):
     """
     Envía correo usando la API de SendGrid.
     Requiere la variable de entorno SENDGRID_API_KEY y SENDGRID_FROM.
+    Si html_content se pasa, se enviará contenido HTML además del plain text.
     """
     if not SENDGRID_API_KEY or not SENDGRID_FROM:
         app.logger.error("SendGrid no está configurado (falta SENDGRID_API_KEY o SENDGRID_FROM).")
@@ -143,6 +144,9 @@ def send_email(to_email: str, subject: str, body: str):
         subject=subject,
         plain_text_content=body
     )
+    if html_content:
+        message.html = html_content
+
     try:
         sg = SendGridAPIClient(SENDGRID_API_KEY)
         resp = sg.send(message)
@@ -194,6 +198,7 @@ def registro():
         nombre = request.form['nombre'].strip()
         correo = request.form['correo'].strip()
         contrasena = request.form['contrasena'].strip()
+        rol = request.form.get('rol', 'tecnico').strip()
 
         # validaciones
         if not usuario or not nombre or not correo or not contrasena:
@@ -208,9 +213,9 @@ def registro():
         conn = get_db_connection()
         c = conn.cursor()
         try:
-            c.execute("""INSERT INTO tecnicos (usuario, nombre, correo, contrasena)
-                         VALUES (%s, %s, %s, %s)""",
-                      (usuario, nombre, correo, contrasena))
+            c.execute("""INSERT INTO tecnicos (usuario, nombre, correo, contrasena, rol)
+                         VALUES (%s, %s, %s, %s, %s)""",
+                      (usuario, nombre, correo, contrasena, rol))
             conn.commit()
             flash('Técnico registrado correctamente', 'success')
             return redirect(url_for('principal'))
@@ -283,10 +288,20 @@ Si no solicitaste este cambio, ignora este correo.
 Saludos,
 Admin - Sistema de Mantenimiento
 """
+        # Opcional: HTML más bonito
+        html_body = f"""
+        <p>Hola <b>{usuario}</b>,</p>
+        <p>Se solicitó restablecer la contraseña de tu cuenta. Haz clic en el siguiente enlace para crear una nueva contraseña (expira en 1 hora):</p>
+        <p><a href="{link}">{link}</a></p>
+        <p>Si no solicitaste este cambio, ignora este correo.</p>
+        <p>Saludos,<br>Admin - Sistema de Mantenimiento</p>
+        """
+
         try:
-            send_email(correo, subject, body)
+            send_email(correo, subject, body, html_content=html_body)
             flash('Se ha enviado un correo con las instrucciones. Revisa tu bandeja.', 'info')
         except Exception:
+            app.logger.exception("Error enviando correo de recuperación")
             flash('No se pudo enviar el correo. Consulta la configuración de SendGrid.', 'danger')
         return redirect(url_for('login'))
 
