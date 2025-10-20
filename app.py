@@ -1,22 +1,28 @@
 import os
 import re
 import secrets
+from io import BytesIO
 from datetime import datetime, timedelta, date
 from functools import wraps
 
+# Flask
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 
-# psycopg3
+# PostgreSQL (psycopg3)
 import psycopg
 from psycopg.rows import dict_row
 from psycopg import errors as psycopg_errors
 
+# Archivos Excel
 import openpyxl
-from io import BytesIO
+
+# PDF (ReportLab)
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from reportlab.lib.units import inch
+from reportlab.lib import colors
 
-# SendGrid
+# Envío de correos (SendGrid)
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
@@ -891,37 +897,104 @@ def acta_pdf(rid):
     c_pdf = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
 
-    # Encabezado más profesional
+    # === Encabezado con logo y título ===
+    logo_path = "static/img/logo.png"  # <-- Coloca aquí la ruta del logo (por ejemplo, en static/img/)
+    if os.path.exists(logo_path):
+        c_pdf.drawImage(logo_path, 50, height - 100, width=100, preserveAspectRatio=True, mask='auto')
+
     c_pdf.setFont("Helvetica-Bold", 16)
-    c_pdf.drawString(50, height - 50, "ACTA DE MANTENIMIENTO")
+    c_pdf.drawString(180, height - 60, "ACTA DE MANTENIMIENTO TÉCNICO")
     c_pdf.setFont("Helvetica", 10)
-    c_pdf.drawString(50, height - 70, f"ID: {registro['id']}    Fecha generación: {date.today().isoformat()}")
-    c_pdf.line(50, height - 75, width - 50, height - 75)
+    c_pdf.drawString(180, height - 75, f"Fecha de emisión: {date.today().isoformat()}")
+    c_pdf.line(50, height - 85, width - 50, height - 85)
 
-    y = height - 95
-    c_pdf.setFont("Helvetica", 12)
+    # === Datos generales ===
+    y = height - 120
+    c_pdf.setFont("Helvetica-Bold", 12)
+    c_pdf.drawString(50, y, "I. DATOS GENERALES")
+    y -= 15
+    c_pdf.setFont("Helvetica", 11)
+    c_pdf.drawString(60, y, f"Sede: {registro['sede']}")
+    y -= 15
+    c_pdf.drawString(60, y, f"Área: {registro['area']}")
+    y -= 15
+    c_pdf.drawString(60, y, f"Técnico responsable: {registro['tecnico']}")
+    y -= 15
+    c_pdf.drawString(60, y, f"Fecha del mantenimiento: {registro['fecha']}")
 
-    for k, v in registro.items():
-        texto = f"{k.replace('_',' ').title()}: {v}"
-        # rompemos en líneas de 100 caracteres para evitar desbordes
-        for linea in [texto[i:i+100] for i in range(0, len(texto), 100)]:
-            c_pdf.drawString(50, y, linea)
-            y -= 15
-            if y < 50:
-                c_pdf.showPage()
-                # reproducir encabezado reducido en nueva página
-                c_pdf.setFont("Helvetica-Bold", 14)
-                c_pdf.drawString(50, height - 40, "ACTA DE MANTENIMIENTO (continuación)")
-                c_pdf.setFont("Helvetica", 12)
-                y = height - 70
+    # === Datos del equipo ===
+    y -= 30
+    c_pdf.setFont("Helvetica-Bold", 12)
+    c_pdf.drawString(50, y, "II. DATOS DEL EQUIPO")
+    y -= 15
+    c_pdf.setFont("Helvetica", 11)
+    equipo_datos = [
+        ("Nombre del equipo", registro['nombre_maquina']),
+        ("Usuario", registro['usuario']),
+        ("Tipo", registro['tipo_equipo']),
+        ("Marca", registro['marca']),
+        ("Modelo", registro['modelo']),
+        ("Serial", registro['serial']),
+        ("Activo fijo", registro['activo_fijo']),
+    ]
+    for campo, valor in equipo_datos:
+        c_pdf.drawString(60, y, f"{campo}: {valor or 'N/A'}")
+        y -= 15
+
+    # === Software instalado ===
+    y -= 20
+    c_pdf.setFont("Helvetica-Bold", 12)
+    c_pdf.drawString(50, y, "III. SOFTWARE Y HERRAMIENTAS")
+    y -= 15
+    c_pdf.setFont("Helvetica", 11)
+    c_pdf.drawString(60, y, f"Sistema Operativo: {registro['sistema_operativo']}")
+    y -= 15
+    c_pdf.drawString(60, y, f"Office: {registro['office']}")
+    y -= 15
+    c_pdf.drawString(60, y, f"Antivirus: {registro['antivirus']}")
+    y -= 15
+    c_pdf.drawString(60, y, f"Compresor: {registro['compresor']}")
+    y -= 15
+    c_pdf.drawString(60, y, f"Control Remoto: {registro['control_remoto']}")
+
+    # === Observaciones ===
+    y -= 25
+    c_pdf.setFont("Helvetica-Bold", 12)
+    c_pdf.drawString(50, y, "IV. OBSERVACIONES")
+    y -= 15
+    c_pdf.setFont("Helvetica", 11)
+    texto = registro['observaciones'] or "Sin observaciones."
+    for linea in texto.splitlines():
+        c_pdf.drawString(60, y, linea)
+        y -= 15
+        if y < 100:
+            c_pdf.showPage()
+            y = height - 100
+
+    # === Firma ===
+    y -= 40
+    c_pdf.setFont("Helvetica-Bold", 12)
+    c_pdf.drawString(50, y, "V. FIRMAS")
+    y -= 60
+    c_pdf.line(100, y, 250, y)
+    c_pdf.line(350, y, 500, y)
+    y -= 12
+    c_pdf.setFont("Helvetica", 10)
+    c_pdf.drawString(120, y, "Técnico responsable")
+    c_pdf.drawString(390, y, "Usuario del equipo")
+
+    # Pie de página
+    c_pdf.setFont("Helvetica-Oblique", 9)
+    c_pdf.setFillColor(colors.grey)
+    c_pdf.drawString(50, 40, "Sistema de Gestión de Mantenimiento - Informe Técnico Generado Automáticamente")
+    c_pdf.setFillColor(colors.black)
 
     c_pdf.save()
     buffer.seek(0)
 
     return send_file(buffer, as_attachment=True,
-                     download_name=f"Acta_Registro_{registro['id']}.pdf",
+                     download_name=f"Acta_Mantenimiento_{registro['id']}.pdf",
                      mimetype='application/pdf')
-
 # ============================================================
 # ADMINISTRACIÓN DE CICLOS TRIMESTRALES
 # ============================================================
