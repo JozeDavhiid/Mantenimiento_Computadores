@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Editar Ciclo{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">✏️ Editar Ciclo Trimestral</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Nombre</label>
+                    <input type="text" name="nombre" class="form-control" value="{{ ciclo.nombre }}">
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">Trimestre</label>
+                    <input type="number" name="trimestre" class="form-control" value="{{ ciclo.trimestre }}">
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">Año</label>
+                    <input type="number" name="anio" class="form-control" value="{{ ciclo.anio }}">
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">Fecha de Inicio</label>
+                    <input type="date" name="fecha_inicio" class="form-control" value="{{ ciclo.fecha_inicio }}">
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">Fecha de Cierre (opcional)</label>
+                    <input type="date" name="fecha_cierre" class="form-control" value="{{ ciclo.fecha_cierre or '' }}">
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">Observaciones</label>
+                    <textarea name="observaciones" class="form-control" rows="3">{{ ciclo.observaciones }}</textarea>
+                </div>
+
+                <div class="d-flex justify-content-start gap-2 mt-3">
+                    <button type="submit" class="btn btn-success">💾 Guardar Cambios</button>
+                    <a href="{{ url_for('admin_ciclos') }}" class="btn btn-secondary">⬅️ Volver</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -102,6 +102,11 @@
                                     🔗 Asociar
                                 </button>
                             </form>
+                            {% if c.activo %}
+                            <a href="{{ url_for('editar_ciclo', ciclo_id=c.id) }}" class="btn btn-sm btn-outline-primary">
+                                ✏️ Editar
+                            </a>
+                            {% endif %}
                         </td>
                     </tr>
                     {% else %}

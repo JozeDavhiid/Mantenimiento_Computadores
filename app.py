@@ -989,6 +989,51 @@ def ver_ciclo(ciclo_id):
 
     return render_template('ver_ciclo.html', ciclo=ciclo, registros=registros)
 
+@app.route('/editar_ciclo/<int:ciclo_id>', methods=['GET', 'POST'])
+@login_required
+def editar_ciclo(ciclo_id):
+    if session.get('rol') != 'admin':
+        flash("Acceso no autorizado", "danger")
+        return redirect(url_for('principal'))
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM ciclos WHERE id=%s", (ciclo_id,))
+    ciclo = c.fetchone()
+
+    if not ciclo:
+        conn.close()
+        flash("Ciclo no encontrado", "warning")
+        return redirect(url_for('admin_ciclos'))
+
+    # Si el ciclo está cerrado, no permitir edición
+    if not ciclo['activo']:
+        conn.close()
+        flash("No puedes modificar un ciclo cerrado.", "warning")
+        return redirect(url_for('admin_ciclos'))
+
+    # Si envía formulario
+    if request.method == 'POST':
+        nombre = request.form.get('nombre')
+        trimestre = request.form.get('trimestre')
+        anio = request.form.get('anio')
+        fecha_inicio = request.form.get('fecha_inicio')
+        fecha_cierre = request.form.get('fecha_cierre') or None
+        observaciones = request.form.get('observaciones')
+
+        c.execute("""
+            UPDATE ciclos 
+            SET nombre=%s, trimestre=%s, anio=%s, fecha_inicio=%s, fecha_cierre=%s, observaciones=%s
+            WHERE id=%s
+        """, (nombre, trimestre, anio, fecha_inicio, fecha_cierre, observaciones, ciclo_id))
+        conn.commit()
+        conn.close()
+        flash("Ciclo actualizado correctamente", "success")
+        return redirect(url_for('admin_ciclos'))
+
+    conn.close()
+    return render_template("editar_ciclo.html", ciclo=ciclo)
+
 @app.route('/admin/ciclos/asociar/<int:ciclo_id>', methods=['POST'])
 @admin_required
 def asociar_mantenimientos_a_ciclo(ciclo_id):
