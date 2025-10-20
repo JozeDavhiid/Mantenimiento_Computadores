@@ -52,145 +52,72 @@ def get_db_connection():
 # Inicializar DB (asegura tablas/columnas)
 # -----------------------
 def init_db():
+    """Inicializa la base de datos con datos base si no existen"""
     conn = get_db_connection()
     c = conn.cursor()
 
-    # --------------------------
-    # Empresas
-    # --------------------------
-    c.execute('''CREATE TABLE IF NOT EXISTS empresas (
-                    id SERIAL PRIMARY KEY,
-                    nombre TEXT UNIQUE NOT NULL,
-                    nit TEXT,
-                    direccion TEXT,
-                    telefono TEXT,
-                    correo TEXT
-                )''')
+    # Crear tablas si no existen
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS empresas (
+            id SERIAL PRIMARY KEY,
+            nombre VARCHAR(100) UNIQUE NOT NULL
+        );
+    """)
 
-    # Insertar empresas base si no existen
-    empresas_base = [
-        'Cuidado Seguro en Casa',
-        'iCare IPS',
-        'Dotarmedica',
-        'Movired'
-    ]
-    for nombre in empresas_base:
-        c.execute("INSERT INTO empresas (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING", (nombre,))
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS ciclos (
+            id SERIAL PRIMARY KEY,
+            nombre VARCHAR(100) NOT NULL,
+            trimestre INT,
+            anio INT,
+            fecha_inicio DATE,
+            fecha_cierre DATE,
+            observaciones TEXT,
+            activo BOOLEAN DEFAULT FALSE,
+            empresa_id INT REFERENCES empresas(id) ON DELETE CASCADE
+        );
+    """)
 
-    # --------------------------
-    # Mantenimiento
-    # --------------------------
-    c.execute('''CREATE TABLE IF NOT EXISTS mantenimiento (
-                    id SERIAL PRIMARY KEY,
-                    sede TEXT,
-                    fecha TEXT,
-                    area TEXT,
-                    tecnico TEXT,
-                    nombre_maquina TEXT,
-                    usuario TEXT,
-                    tipo_equipo TEXT,
-                    marca TEXT,
-                    modelo TEXT,
-                    serial TEXT,
-                    sistema_operativo TEXT,
-                    office TEXT,
-                    antivirus TEXT,
-                    compresor TEXT,
-                    control_remoto TEXT,
-                    activo_fijo TEXT,
-                    observaciones TEXT
-                )''')
-    # columnas nuevas
-    c.execute("ALTER TABLE mantenimiento ADD COLUMN IF NOT EXISTS ciclo_id INTEGER")
-    c.execute("ALTER TABLE mantenimiento ADD COLUMN IF NOT EXISTS cerrado BOOLEAN DEFAULT FALSE")
-    c.execute("ALTER TABLE mantenimiento ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id)")
+    # Asegurar restricción única por empresa (nombre + empresa_id)
+    c.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'unique_nombre_empresa'
+            ) THEN
+                ALTER TABLE ciclos ADD CONSTRAINT unique_nombre_empresa UNIQUE (nombre, empresa_id);
+            END IF;
+        END $$;
+    """)
 
-    # --------------------------
-    # Tecnicos
-    # --------------------------
-    c.execute('''CREATE TABLE IF NOT EXISTS tecnicos (
-                    id SERIAL PRIMARY KEY,
-                    usuario TEXT UNIQUE,
-                    nombre TEXT,
-                    correo TEXT UNIQUE,
-                    contrasena TEXT,
-                    rol TEXT DEFAULT 'tecnico'
-                )''')
-
-    # --------------------------
-    # Password resets
-    # --------------------------
-    c.execute('''CREATE TABLE IF NOT EXISTS password_resets (
-                    id SERIAL PRIMARY KEY,
-                    usuario TEXT,
-                    token TEXT UNIQUE,
-                    expires_at TIMESTAMP
-                )''')
-
-    # --------------------------
-    # Ciclos
-    # --------------------------
-    c.execute('''CREATE TABLE IF NOT EXISTS ciclos (
-                    id SERIAL PRIMARY KEY,
-                    nombre TEXT
-                )''')
-
-    # comprobar columnas de ciclos y agregarlas si faltan
-    c.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'ciclos'")
-    columnas_existentes = [r['column_name'] for r in c.fetchall()]
-
-    if 'trimestre' not in columnas_existentes:
-        c.execute("ALTER TABLE ciclos ADD COLUMN trimestre INTEGER")
-    if 'anio' not in columnas_existentes:
-        c.execute("ALTER TABLE ciclos ADD COLUMN anio INTEGER")
-    if 'fecha_inicio' not in columnas_existentes:
-        c.execute("ALTER TABLE ciclos ADD COLUMN fecha_inicio DATE")
-    if 'fecha_cierre' not in columnas_existentes:
-        c.execute("ALTER TABLE ciclos ADD COLUMN fecha_cierre DATE")
-    if 'observaciones' not in columnas_existentes:
-        c.execute("ALTER TABLE ciclos ADD COLUMN observaciones TEXT")
-    if 'activo' not in columnas_existentes:
-        c.execute("ALTER TABLE ciclos ADD COLUMN activo BOOLEAN DEFAULT TRUE")
-    if 'empresa_id' not in columnas_existentes:
-        c.execute("ALTER TABLE ciclos ADD COLUMN empresa_id INTEGER REFERENCES empresas(id)")
-
-    # --------------------------
-    # Usuario admin por defecto
-    # --------------------------
-    c.execute("SELECT * FROM tecnicos WHERE usuario='admin'")
-    if not c.fetchone():
-        c.execute("""INSERT INTO tecnicos (usuario, nombre, correo, contrasena, rol)
-                     VALUES (%s, %s, %s, %s, %s)""",
-                  ('admin', 'Administrador', 'admin@example.com', '1234', 'admin'))
-
-    # --------------------------
-    # Crear ciclo del 11/08/2025 al 09/10/2025 para la primera empresa si no existe
-    # --------------------------
-    c.execute("SELECT id FROM empresas ORDER BY id LIMIT 1")
-    first_emp = c.fetchone()
-    empresa_base_id = first_emp['id'] if first_emp else None
-
-    c.execute("""SELECT id FROM ciclos WHERE fecha_inicio = %s AND fecha_cierre = %s AND empresa_id = %s""",
-              ('2025-08-11', '2025-10-09', empresa_base_id))
-    ciclo_existente = c.fetchone()
-    if not ciclo_existente and empresa_base_id:
-        c.execute("""INSERT INTO ciclos (nombre, trimestre, anio, fecha_inicio, fecha_cierre, observaciones, activo, empresa_id)
-                     VALUES (%s, %s, %s, %s, %s, %s, FALSE, %s) RETURNING id""",
-                  ('Ciclo Ago-Oct 2025', 3, 2025, '2025-08-11', '2025-10-09',
-                   'Ciclo previo a la implementación de control trimestral', empresa_base_id))
-        ciclo_id = c.fetchone()['id']
-    elif ciclo_existente:
-        ciclo_id = ciclo_existente['id']
+    # Crear empresa base si no existe
+    c.execute("SELECT id FROM empresas WHERE nombre = %s", ('Empresa Base',))
+    empresa = c.fetchone()
+    if not empresa:
+        c.execute("INSERT INTO empresas (nombre) VALUES (%s) RETURNING id", ('Empresa Base',))
+        empresa_base_id = c.fetchone()['id']
     else:
-        ciclo_id = None
+        empresa_base_id = empresa['id']
 
-    # Asociar registros antiguos sin ciclo/empresa al ciclo/empresa base
-    if ciclo_id and empresa_base_id:
-        c.execute("UPDATE mantenimiento SET ciclo_id = %s, empresa_id = %s WHERE ciclo_id IS NULL OR empresa_id IS NULL",
-                  (ciclo_id, empresa_base_id))
+    # Insertar ciclo base solo si no existe en esa empresa
+    c.execute("""
+        SELECT id FROM ciclos
+        WHERE nombre = %s AND empresa_id = %s
+    """, ('Ciclo Ago-Oct 2025', empresa_base_id))
+    if not c.fetchone():
+        c.execute("""
+            INSERT INTO ciclos (nombre, trimestre, anio, fecha_inicio, fecha_cierre, observaciones, activo, empresa_id)
+            VALUES (%s, %s, %s, %s, %s, %s, FALSE, %s)
+        """, (
+            'Ciclo Ago-Oct 2025', 3, 2025,
+            '2025-08-11', '2025-10-09',
+            'Ciclo previo a la implementación de control trimestral',
+            empresa_base_id
+        ))
 
     conn.commit()
     conn.close()
+    print("✅ Base de datos inicializada correctamente.")
 
 # Ejecutar init al iniciar la app
 with app.app_context():
