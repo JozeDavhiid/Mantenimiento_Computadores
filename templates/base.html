@@ -87,6 +87,21 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- ✅ Script global para abrir todos los enlaces en la misma pestaña -->
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('a').forEach(link => {
+            // Evita abrir en nueva pestaña
+            if (link.getAttribute('target') === '_blank') {
+                link.removeAttribute('target');
+            }
+            // Fuerza apertura en la misma pestaña
+            link.setAttribute('target', '_self');
+        });
+    });
+    </script>
+
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>
