@@ -4,7 +4,7 @@
 {% block content %}
 <div class="container mt-4">
 
-    <!-- Mostrar mensajes flash -->
+    <!-- Mensajes flash -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         <div class="mt-2">
@@ -20,8 +20,27 @@
 
     <h3 class="mb-4">📅 Administración de Ciclos Trimestrales</h3>
 
+    <!-- Seleccionar empresa -->
+    <form method="GET" class="mb-4">
+        <div class="row align-items-end">
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Empresa</label>
+                <select name="empresa_id" class="form-select" onchange="this.form.submit()">
+                    <option value="">-- Selecciona una empresa --</option>
+                    {% for e in empresas %}
+                        <option value="{{ e.id }}" {% if empresa_seleccionada == e.id %}selected{% endif %}>
+                            {{ e.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </form>
+
+    {% if empresa_seleccionada %}
     <!-- Formulario para crear nuevo ciclo -->
     <form method="POST" class="mb-4">
+        <input type="hidden" name="empresa_id" value="{{ empresa_seleccionada }}">
         <div class="card p-3 shadow-sm">
             <h5>Crear nuevo ciclo</h5>
             <div class="row g-2">
@@ -49,18 +68,30 @@
         </div>
     </form>
 
-    <!-- Botón para cerrar el ciclo activo -->
-    <form method="POST" class="mb-4">
+    <!-- Botón para cerrar ciclo activo -->
+    <form method="POST" class="mb-4 d-flex align-items-center gap-2">
+        <input type="hidden" name="empresa_id" value="{{ empresa_seleccionada }}">
         <button class="btn btn-warning" name="action" value="cerrar"
-                onclick="return confirm('¿Seguro que deseas cerrar el ciclo activo?');">
+                onclick="return confirm('¿Seguro que deseas cerrar el ciclo activo de esta empresa?');">
             🔒 Cerrar Ciclo Activo
         </button>
     </form>
 
+    {% else %}
+        <div class="alert alert-info">
+            Selecciona una empresa para administrar sus ciclos.
+        </div>
+    {% endif %}
+
     <!-- Tabla de ciclos existentes -->
-    <div class="card shadow-sm">
-        <div class="card-header bg-primary text-white">
+    <div class="card shadow-sm mt-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
             <strong>Historial de Ciclos</strong>
+            {% if empresa_seleccionada %}
+                <span class="small">Empresa:
+                    <b>{{ empresas | selectattr('id', 'equalto', empresa_seleccionada) | map(attribute='nombre') | first }}</b>
+                </span>
+            {% endif %}
         </div>
         <div class="card-body table-responsive">
             <table class="table table-hover align-middle">
@@ -112,7 +143,7 @@
                     {% else %}
                     <tr>
                         <td colspan="8" class="text-center text-muted">
-                            No hay ciclos registrados
+                            No hay ciclos registrados para esta empresa
                         </td>
                     </tr>
                     {% endfor %}
@@ -120,6 +151,8 @@
             </table>
         </div>
     </div>
+
+    <!-- Botón volver -->
     <div class="text-center mt-3">
         <a href="{{ url_for('principal') }}" class="btn btn-dark btn-lg">
             ⬅️ Volver al Panel Principal

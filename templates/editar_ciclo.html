@@ -4,9 +4,13 @@
 {% block content %}
 <div class="container mt-4">
     <div class="card shadow-sm">
-        <div class="card-header bg-primary text-white">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
             <h5 class="mb-0">✏️ Editar Ciclo Trimestral</h5>
+            {% if ciclo.empresa_nombre %}
+            <span class="badge bg-light text-dark">Empresa: {{ ciclo.empresa_nombre }}</span>
+            {% endif %}
         </div>
+
         <div class="card-body">
             <form method="POST" class="row g-3">
                 <div class="col-md-4">
@@ -32,6 +36,18 @@
                 <div class="col-md-4">
                     <label class="form-label">Fecha de Cierre (opcional)</label>
                     <input type="date" name="fecha_cierre" class="form-control" value="{{ ciclo.fecha_cierre or '' }}">
+                </div>
+
+                <!-- NUEVO: selector de empresa -->
+                <div class="col-md-4">
+                    <label class="form-label">Empresa</label>
+                    <select name="empresa_id" class="form-select" required>
+                        {% for e in empresas %}
+                            <option value="{{ e.id }}" {% if e.id == ciclo.empresa_id %}selected{% endif %}>
+                                {{ e.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
                 </div>
 
                 <div class="col-12">

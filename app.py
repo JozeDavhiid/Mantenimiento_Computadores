@@ -1,3 +1,4 @@
+# app.py (completo)
 import os
 import re
 import secrets
@@ -40,27 +41,45 @@ SENDGRID_FROM = os.environ.get('SENDGRID_FROM') or os.environ.get('SMTP_FROM')  
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
-
 # -----------------------
 # Función conexión DB (psycopg3) - devuelve conexión con row_factory dict_row
 # -----------------------
 def get_db_connection():
-    # psycopg.connect soporta URL de conexión PostgreSQL
-    # usamos row_factory=dict_row para que fetchone/fetchall devuelvan dicts
     conn = psycopg.connect(DB_URL, autocommit=False, row_factory=dict_row)
     return conn
 
-
 # -----------------------
-# Inicializar DB (asegura columnas/tabla reset)
+# Inicializar DB (asegura tablas/columnas)
 # -----------------------
 def init_db():
     conn = get_db_connection()
     c = conn.cursor()
 
-    # ===========================
-    # Tabla mantenimiento
-    # ===========================
+    # --------------------------
+    # Empresas
+    # --------------------------
+    c.execute('''CREATE TABLE IF NOT EXISTS empresas (
+                    id SERIAL PRIMARY KEY,
+                    nombre TEXT UNIQUE NOT NULL,
+                    nit TEXT,
+                    direccion TEXT,
+                    telefono TEXT,
+                    correo TEXT
+                )''')
+
+    # Insertar empresas base si no existen
+    empresas_base = [
+        'Cuidado Seguro en Casa',
+        'iCare IPS',
+        'Dotarmedica',
+        'Movired'
+    ]
+    for nombre in empresas_base:
+        c.execute("INSERT INTO empresas (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING", (nombre,))
+
+    # --------------------------
+    # Mantenimiento
+    # --------------------------
     c.execute('''CREATE TABLE IF NOT EXISTS mantenimiento (
                     id SERIAL PRIMARY KEY,
                     sede TEXT,
@@ -81,14 +100,14 @@ def init_db():
                     activo_fijo TEXT,
                     observaciones TEXT
                 )''')
-
-    # Asegurar columnas nuevas en mantenimiento
+    # columnas nuevas
     c.execute("ALTER TABLE mantenimiento ADD COLUMN IF NOT EXISTS ciclo_id INTEGER")
     c.execute("ALTER TABLE mantenimiento ADD COLUMN IF NOT EXISTS cerrado BOOLEAN DEFAULT FALSE")
+    c.execute("ALTER TABLE mantenimiento ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id)")
 
-    # ===========================
-    # Tabla técnicos
-    # ===========================
+    # --------------------------
+    # Tecnicos
+    # --------------------------
     c.execute('''CREATE TABLE IF NOT EXISTS tecnicos (
                     id SERIAL PRIMARY KEY,
                     usuario TEXT UNIQUE,
@@ -98,9 +117,9 @@ def init_db():
                     rol TEXT DEFAULT 'tecnico'
                 )''')
 
-    # ===========================
-    # Tabla password_resets
-    # ===========================
+    # --------------------------
+    # Password resets
+    # --------------------------
     c.execute('''CREATE TABLE IF NOT EXISTS password_resets (
                     id SERIAL PRIMARY KEY,
                     usuario TEXT,
@@ -108,77 +127,74 @@ def init_db():
                     expires_at TIMESTAMP
                 )''')
 
-    # ===========================
-    # Tabla ciclos (para control trimestral)
-    # ===========================
+    # --------------------------
+    # Ciclos
+    # --------------------------
     c.execute('''CREATE TABLE IF NOT EXISTS ciclos (
                     id SERIAL PRIMARY KEY,
                     nombre TEXT
                 )''')
 
-    # 🔧 Verificar y agregar columnas faltantes en "ciclos"
+    # comprobar columnas de ciclos y agregarlas si faltan
     c.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'ciclos'")
     columnas_existentes = [r['column_name'] for r in c.fetchall()]
 
     if 'trimestre' not in columnas_existentes:
         c.execute("ALTER TABLE ciclos ADD COLUMN trimestre INTEGER")
-
     if 'anio' not in columnas_existentes:
         c.execute("ALTER TABLE ciclos ADD COLUMN anio INTEGER")
-
     if 'fecha_inicio' not in columnas_existentes:
         c.execute("ALTER TABLE ciclos ADD COLUMN fecha_inicio DATE")
-
     if 'fecha_cierre' not in columnas_existentes:
         c.execute("ALTER TABLE ciclos ADD COLUMN fecha_cierre DATE")
-
     if 'observaciones' not in columnas_existentes:
         c.execute("ALTER TABLE ciclos ADD COLUMN observaciones TEXT")
-
     if 'activo' not in columnas_existentes:
         c.execute("ALTER TABLE ciclos ADD COLUMN activo BOOLEAN DEFAULT TRUE")
+    if 'empresa_id' not in columnas_existentes:
+        c.execute("ALTER TABLE ciclos ADD COLUMN empresa_id INTEGER REFERENCES empresas(id)")
 
-    # ===========================
-    # Usuario administrador por defecto
-    # ===========================
+    # --------------------------
+    # Usuario admin por defecto
+    # --------------------------
     c.execute("SELECT * FROM tecnicos WHERE usuario='admin'")
     if not c.fetchone():
-        c.execute("""
-            INSERT INTO tecnicos (usuario, nombre, correo, contrasena, rol)
-            VALUES (%s, %s, %s, %s, %s)
-        """, ('admin', 'Administrador', 'admin@example.com', '1234', 'admin'))
+        c.execute("""INSERT INTO tecnicos (usuario, nombre, correo, contrasena, rol)
+                     VALUES (%s, %s, %s, %s, %s)""",
+                  ('admin', 'Administrador', 'admin@example.com', '1234', 'admin'))
 
-    # ===========================
-    # Crear ciclo del 11/08/2025 al 09/10/2025
-    # ===========================
-    c.execute("""
-        SELECT id FROM ciclos 
-        WHERE fecha_inicio = %s AND fecha_cierre = %s
-    """, ('2025-08-11', '2025-10-09'))
+    # --------------------------
+    # Crear ciclo del 11/08/2025 al 09/10/2025 para la primera empresa si no existe
+    # --------------------------
+    c.execute("SELECT id FROM empresas ORDER BY id LIMIT 1")
+    first_emp = c.fetchone()
+    empresa_base_id = first_emp['id'] if first_emp else None
+
+    c.execute("""SELECT id FROM ciclos WHERE fecha_inicio = %s AND fecha_cierre = %s AND empresa_id = %s""",
+              ('2025-08-11', '2025-10-09', empresa_base_id))
     ciclo_existente = c.fetchone()
-
-    if not ciclo_existente:
-        c.execute("""
-            INSERT INTO ciclos (nombre, trimestre, anio, fecha_inicio, fecha_cierre, observaciones, activo)
-            VALUES (%s, %s, %s, %s, %s, %s, FALSE)
-            RETURNING id
-        """, ('Ciclo Ago-Oct 2025', 3, 2025, '2025-08-11', '2025-10-09', 'Ciclo previo a la implementación de control trimestral'))
+    if not ciclo_existente and empresa_base_id:
+        c.execute("""INSERT INTO ciclos (nombre, trimestre, anio, fecha_inicio, fecha_cierre, observaciones, activo, empresa_id)
+                     VALUES (%s, %s, %s, %s, %s, %s, FALSE, %s) RETURNING id""",
+                  ('Ciclo Ago-Oct 2025', 3, 2025, '2025-08-11', '2025-10-09',
+                   'Ciclo previo a la implementación de control trimestral', empresa_base_id))
         ciclo_id = c.fetchone()['id']
-    else:
+    elif ciclo_existente:
         ciclo_id = ciclo_existente['id']
+    else:
+        ciclo_id = None
 
-    # ===========================
-    # Asociar registros antiguos a este ciclo
-    # ===========================
-    c.execute("UPDATE mantenimiento SET ciclo_id = %s WHERE ciclo_id IS NULL", (ciclo_id,))
+    # Asociar registros antiguos sin ciclo/empresa al ciclo/empresa base
+    if ciclo_id and empresa_base_id:
+        c.execute("UPDATE mantenimiento SET ciclo_id = %s, empresa_id = %s WHERE ciclo_id IS NULL OR empresa_id IS NULL",
+                  (ciclo_id, empresa_base_id))
 
     conn.commit()
     conn.close()
 
-# Ejecutar al iniciar la app
+# Ejecutar init al iniciar la app
 with app.app_context():
     init_db()
-
 
 # -----------------------
 # Decoradores utilitarios
@@ -192,7 +208,6 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
-
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -202,16 +217,10 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
-
 # -----------------------
 # Util: enviar correo mediante SendGrid API
 # -----------------------
 def send_email(to_email: str, subject: str, body: str, html_content: str = None):
-    """
-    Envía correo usando la API de SendGrid.
-    Requiere la variable de entorno SENDGRID_API_KEY y SENDGRID_FROM.
-    Si html_content se pasa, se enviará contenido HTML además del plain text.
-    """
     if not SENDGRID_API_KEY or not SENDGRID_FROM:
         app.logger.error("SendGrid no está configurado (falta SENDGRID_API_KEY o SENDGRID_FROM).")
         raise RuntimeError("SendGrid no configurado")
@@ -234,35 +243,27 @@ def send_email(to_email: str, subject: str, body: str, html_content: str = None)
         app.logger.exception("Error enviando correo con SendGrid")
         raise
 
-
 # -----------------------
-# Helpers relacionados a ciclos
+# Helpers relacionados a empresas/ciclos
 # -----------------------
-def get_active_cycle(conn=None):
-    """Devuelve el ciclo activo (dict) o None."""
+def get_active_cycle(conn=None, empresa_id=None):
+    """Devuelve el ciclo activo (dict) o None — tiene en cuenta empresa_id si se pasa."""
     close_conn = False
     if conn is None:
         conn = get_db_connection()
         close_conn = True
     c = conn.cursor()
-    c.execute("SELECT * FROM ciclos WHERE activo=TRUE ORDER BY id DESC LIMIT 1")
+    if empresa_id:
+        c.execute("SELECT * FROM ciclos WHERE activo=TRUE AND empresa_id=%s ORDER BY id DESC LIMIT 1", (empresa_id,))
+    else:
+        c.execute("SELECT * FROM ciclos WHERE activo=TRUE ORDER BY id DESC LIMIT 1")
     ciclo = c.fetchone()
     if close_conn:
         conn.close()
     return ciclo
 
-
-def has_active_cycle():
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) as cnt FROM ciclos WHERE activo=TRUE")
-    cnt = c.fetchone()['cnt']
-    conn.close()
-    return cnt > 0
-
-
 # -----------------------
-# Rutas principales (sin cambios de nombres)
+# Rutas principales
 # -----------------------
 @app.route('/')
 def home():
@@ -270,29 +271,53 @@ def home():
         return redirect(url_for('principal'))
     return redirect(url_for('login'))
 
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    # Aseguramos existencia de empresas (por si alguien eliminó)
+    c.execute("SELECT COUNT(*) FROM empresas")
+    if c.fetchone()['count'] == 0:
+        empresas_default = ['Cuidado Seguro en Casa', 'iCare IPS', 'Dotarmedica', 'Movired']
+        for e in empresas_default:
+            c.execute("INSERT INTO empresas (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING", (e,))
+        conn.commit()
+
+    # Obtener empresas para select en login
+    c.execute("SELECT id, nombre FROM empresas ORDER BY nombre")
+    empresas = c.fetchall()
+
     if request.method == 'POST':
         usuario = request.form['usuario'].strip()
         contrasena = request.form['contrasena'].strip()
+        empresa_id = request.form.get('empresa_id')
 
-        conn = get_db_connection()
-        c = conn.cursor()
+        if not empresa_id:
+            flash('Selecciona una empresa', 'warning')
+            conn.close()
+            return render_template('login.html', empresas=empresas)
+
         c.execute("SELECT usuario, nombre, correo, contrasena, rol FROM tecnicos WHERE usuario=%s", (usuario,))
         row = c.fetchone()
-        conn.close()
 
-        # COMPARACIÓN EN TEXTO PLANO (según petición)
         if row and row['contrasena'] == contrasena:
             session['usuario'] = row['usuario']
             session['nombre'] = row['nombre']
-            session['rol'] = row.get('rol', 'tecnico') if isinstance(row, dict) else 'tecnico'
-            flash(f'Bienvenido {row["nombre"]}', 'success')
+            session['rol'] = row.get('rol', 'tecnico')
+            session['empresa_id'] = int(empresa_id)
+            # guardar nombre empresa
+            c.execute("SELECT nombre FROM empresas WHERE id=%s", (empresa_id,))
+            emp = c.fetchone()
+            session['empresa_nombre'] = emp['nombre'] if emp else 'Sin Empresa'
+            conn.close()
+            flash(f"Bienvenido {row['nombre']} ({session['empresa_nombre']})", 'success')
             return redirect(url_for('principal'))
-        flash('Usuario o contraseña incorrectos', 'danger')
-    return render_template('login.html')
 
+        flash('Usuario o contraseña incorrectos', 'danger')
+
+    conn.close()
+    return render_template('login.html', empresas=empresas)
 
 @app.route('/registro', methods=['GET', 'POST'])
 @admin_required
@@ -334,15 +359,13 @@ def registro():
             conn.close()
     return render_template('registro.html')
 
-
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
 
-
 # -----------------------
-# Recuperación por correo (SendGrid) - sin cambios lógicos
+# Recuperación por correo (SendGrid)
 # -----------------------
 @app.route('/recuperar', methods=['GET', 'POST'])
 def recuperar():
@@ -392,7 +415,6 @@ Si no solicitaste este cambio, ignora este correo.
 Saludos,
 Admin - Sistema de Mantenimiento
 """
-        # Opcional: HTML más bonito
         html_body = f"""
         <p>Hola <b>{usuario}</b>,</p>
         <p>Se solicitó restablecer la contraseña de tu cuenta. Haz clic en el siguiente enlace para crear una nueva contraseña (expira en 1 hora):</p>
@@ -411,7 +433,6 @@ Admin - Sistema de Mantenimiento
 
     return render_template('recuperar.html')
 
-
 @app.route('/recuperar/confirm', methods=['GET', 'POST'])
 def recuperar_confirm():
     token = request.args.get('token') or request.form.get('token')
@@ -429,10 +450,7 @@ def recuperar_confirm():
         return redirect(url_for('recuperar'))
 
     expires_at = row['expires_at']
-    if isinstance(expires_at, str):
-        expires_at_dt = datetime.fromisoformat(expires_at)
-    else:
-        expires_at_dt = expires_at
+    expires_at_dt = datetime.fromisoformat(expires_at) if isinstance(expires_at, str) else expires_at
 
     if datetime.utcnow() > expires_at_dt:
         c.execute("DELETE FROM password_resets WHERE token=%s", (token,))
@@ -469,45 +487,141 @@ def recuperar_confirm():
     conn.close()
     return render_template('recuperar_confirm.html', token=token)
 
-@app.route('/admin/ciclos/cerrar/<int:cid>', methods=['POST'])
+# -----------------------
+# ADMINISTRACIÓN DE CICLOS (solo admin)
+# -----------------------
+@app.route('/admin_ciclos', methods=['GET', 'POST'])
 @admin_required
-def cerrar_ciclo(cid):
-    """
-    Cierra el ciclo especificado:
-    - marca ciclos.activo = FALSE y fecha_cierre = hoy
-    - marca mantenimiento.cerrado = TRUE para registros con ciclo_id = cid
-    """
+def admin_ciclos():
     conn = get_db_connection()
     c = conn.cursor()
-    # verificar que exista y sea activo
-    c.execute("SELECT * FROM ciclos WHERE id=%s", (cid,))
+
+    # 🔹 Obtener lista de empresas
+    c.execute("SELECT id, nombre FROM empresas ORDER BY nombre")
+    empresas = c.fetchall()
+
+    # 🔹 Empresa seleccionada (por GET o POST)
+    empresa_seleccionada = request.args.get('empresa_id') or request.form.get('empresa_id')
+    empresa_seleccionada = int(empresa_seleccionada) if empresa_seleccionada else None
+
+    hoy = date.today().isoformat()
+
+    # ==============================
+    # Crear nuevo ciclo
+    # ==============================
+    if request.method == 'POST' and request.form.get('action') == 'nuevo':
+        if not empresa_seleccionada:
+            flash('⚠️ Debes seleccionar una empresa antes de crear un ciclo.', 'warning')
+            conn.close()
+            return redirect(url_for('admin_ciclos'))
+
+        # Cerrar ciclo activo previo de esa empresa
+        c.execute("""
+            UPDATE ciclos 
+            SET activo = FALSE, fecha_cierre = %s 
+            WHERE activo = TRUE AND empresa_id = %s
+        """, (date.today(), empresa_seleccionada))
+
+        nombre = request.form.get('nombre', f"Ciclo {date.today().strftime('%b %Y')}")
+        trimestre = request.form.get('trimestre', 1)
+        anio = request.form.get('anio', date.today().year)
+        fecha_inicio = request.form.get('fecha_inicio', date.today())
+        observaciones = request.form.get('observaciones', '')
+
+        c.execute("""
+            INSERT INTO ciclos (nombre, trimestre, anio, fecha_inicio, observaciones, activo, empresa_id)
+            VALUES (%s, %s, %s, %s, %s, TRUE, %s)
+        """, (nombre, trimestre, anio, fecha_inicio, observaciones, empresa_seleccionada))
+
+        conn.commit()
+        conn.close()
+        flash('✅ Nuevo ciclo creado correctamente.', 'success')
+        return redirect(url_for('admin_ciclos', empresa_id=empresa_seleccionada))
+
+    # ==============================
+    # Cerrar ciclo activo
+    # ==============================
+    if request.method == 'POST' and request.form.get('action') == 'cerrar':
+        if not empresa_seleccionada:
+            flash('⚠️ Selecciona una empresa para cerrar su ciclo activo.', 'warning')
+            conn.close()
+            return redirect(url_for('admin_ciclos'))
+
+        c.execute("""
+            SELECT id FROM ciclos 
+            WHERE activo = TRUE AND empresa_id = %s 
+            ORDER BY id DESC LIMIT 1
+        """, (empresa_seleccionada,))
+        ciclo_activo = c.fetchone()
+
+        if ciclo_activo:
+            c.execute("""
+                UPDATE ciclos 
+                SET activo = FALSE, fecha_cierre = %s 
+                WHERE id = %s
+            """, (date.today(), ciclo_activo['id']))
+            c.execute("""
+                UPDATE mantenimiento 
+                SET cerrado = TRUE 
+                WHERE ciclo_id = %s
+            """, (ciclo_activo['id'],))
+            conn.commit()
+            flash('🔒 Ciclo cerrado exitosamente.', 'info')
+        else:
+            flash('⚠️ No hay ciclo activo para cerrar en esta empresa.', 'warning')
+
+        conn.close()
+        return redirect(url_for('admin_ciclos', empresa_id=empresa_seleccionada))
+
+    # ==============================
+    # Mostrar los ciclos de la empresa seleccionada
+    # ==============================
+    if empresa_seleccionada:
+        c.execute("""
+            SELECT * FROM ciclos 
+            WHERE empresa_id = %s 
+            ORDER BY id DESC
+        """, (empresa_seleccionada,))
+        ciclos = c.fetchall()
+    else:
+        ciclos = []
+
+    conn.close()
+
+    return render_template(
+        'admin_ciclos.html',
+        empresas=empresas,
+        empresa_seleccionada=empresa_seleccionada,
+        ciclos=ciclos,
+        hoy=hoy
+    )
+
+@app.route('/admin/ciclos/asociar/<int:ciclo_id>', methods=['POST'])
+@admin_required
+def asociar_mantenimientos_a_ciclo(ciclo_id):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM ciclos WHERE id=%s", (ciclo_id,))
     ciclo = c.fetchone()
     if not ciclo:
         conn.close()
-        flash('Ciclo no encontrado', 'warning')
+        flash("El ciclo seleccionado no existe.", "danger")
         return redirect(url_for('admin_ciclos'))
 
-    if not ciclo['activo']:
+    # Sólo asociar mantenimientos que pertenezcan a la misma empresa o que no tengan empresa asignada
+    c.execute("SELECT COUNT(*) FROM mantenimiento WHERE ciclo_id IS NULL AND (empresa_id IS NULL OR empresa_id=%s)", (ciclo['empresa_id'],))
+    total_sin_ciclo = c.fetchone()['count']
+    if total_sin_ciclo == 0:
         conn.close()
-        flash('El ciclo ya está cerrado', 'info')
+        flash("No hay mantenimientos pendientes por asociar para esta empresa.", "info")
         return redirect(url_for('admin_ciclos'))
 
-    try:
-        hoy = date.today()
-        c.execute("UPDATE ciclos SET activo=FALSE, fecha_cierre=%s WHERE id=%s", (hoy, cid))
-        # marcar mantenimientos de ese ciclo como cerrados
-        c.execute("UPDATE mantenimiento SET cerrado=TRUE WHERE ciclo_id=%s", (cid,))
-        conn.commit()
-        flash('Ciclo cerrado correctamente. Los registros del ciclo ahora son de solo lectura.', 'success')
-    except Exception:
-        conn.rollback()
-        app.logger.exception("Error cerrando ciclo")
-        flash('Error al cerrar ciclo', 'danger')
-    finally:
-        conn.close()
-
+    c.execute("UPDATE mantenimiento SET ciclo_id=%s, empresa_id=%s WHERE ciclo_id IS NULL AND (empresa_id IS NULL OR empresa_id=%s)",
+              (ciclo_id, ciclo['empresa_id'], ciclo['empresa_id']))
+    conn.commit()
+    conn.close()
+    flash(f"{total_sin_ciclo} mantenimientos asociados al ciclo '{ciclo['nombre']}'.", "success")
     return redirect(url_for('admin_ciclos'))
-
 
 # -----------------------
 # Resto de rutas (principal, CRUD mantenimiento, export, acta)
@@ -518,26 +632,31 @@ def principal():
     conn = get_db_connection()
     c = conn.cursor()
 
-    # Obtener todos los ciclos para el menú (solo visible para admin)
-    c.execute("SELECT * FROM ciclos ORDER BY id DESC")
+    # Obtener todos los ciclos de la empresa de la sesión (si aplica)
+    empresa_id_session = session.get('empresa_id')
+    c.execute("SELECT * FROM ciclos WHERE empresa_id=%s ORDER BY id DESC", (empresa_id_session,)) if empresa_id_session else c.execute("SELECT * FROM ciclos ORDER BY id DESC")
     ciclos = c.fetchall()
 
-    # Ciclo activo (por defecto)
-    ciclo_activo = get_active_cycle(conn)
+    # Ciclo activo para la empresa de la sesión
+    ciclo_activo = get_active_cycle(conn, empresa_id=empresa_id_session)
 
-    # Permitir seleccionar ciclo manualmente (solo vista)
+    # Permitir al admin seleccionar un ciclo para ver (GET param)
     ciclo_id_param = request.args.get('ciclo_id', type=int)
     ciclo_seleccionado = None
     if ciclo_id_param:
         c.execute("SELECT * FROM ciclos WHERE id=%s", (ciclo_id_param,))
         ciclo_seleccionado = c.fetchone()
+        # aseguramos que el ciclo seleccionado pertenezca a la misma empresa de la sesión o a ninguna si admin no seleccionó empresa
+        if ciclo_seleccionado and empresa_id_session and ciclo_seleccionado.get('empresa_id') != empresa_id_session:
+            ciclo_seleccionado = None
+
     if not ciclo_seleccionado:
         ciclo_seleccionado = ciclo_activo
 
-    # Si el usuario guarda un mantenimiento
+    # Guardar mantenimiento
     if request.method == 'POST' and request.form.get('action') == 'guardar':
         if not ciclo_activo:
-            flash('⚠️ No hay un ciclo activo. Contacta al administrador para abrir un ciclo antes de registrar mantenimientos.', 'warning')
+            flash('No hay un ciclo activo. Contacta al administrador.', 'warning')
             conn.close()
             return redirect(url_for('principal'))
 
@@ -559,26 +678,33 @@ def principal():
             request.form.get('control_remoto', ''),
             request.form.get('activo_fijo', ''),
             request.form.get('observaciones', ''),
-            ciclo_activo['id']
+            ciclo_activo['id'],
+            empresa_id_session
         )
         c.execute('''INSERT INTO mantenimiento
                     (sede, fecha, area, tecnico, nombre_maquina, usuario, tipo_equipo, marca, modelo, serial,
-                     sistema_operativo, office, antivirus, compresor, control_remoto, activo_fijo, observaciones, ciclo_id)
-                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''', datos)
+                     sistema_operativo, office, antivirus, compresor, control_remoto, activo_fijo, observaciones, ciclo_id, empresa_id)
+                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''', datos)
         conn.commit()
-        flash('✅ Registro guardado correctamente', 'success')
+        flash('Registro guardado correctamente', 'success')
 
-    # Determinar de qué ciclo mostrar los registros
+    # Determinar ciclo para consultas
     ciclo_para_consultar = ciclo_seleccionado['id'] if ciclo_seleccionado else None
 
-    # Últimos registros del ciclo seleccionado o globales
+    # Últimos registros (filtrados por empresa y ciclo si corresponde)
     if ciclo_para_consultar:
         c.execute("SELECT * FROM mantenimiento WHERE ciclo_id=%s ORDER BY id DESC LIMIT 10", (ciclo_para_consultar,))
+    elif empresa_id_session:
+        c.execute("SELECT * FROM mantenimiento WHERE empresa_id=%s ORDER BY id DESC LIMIT 10", (empresa_id_session,))
     else:
         c.execute("SELECT * FROM mantenimiento ORDER BY id DESC LIMIT 10")
     registros = c.fetchall()
 
-    # Estadísticas: si hay ciclo seleccionado, filtra por él
+    # Estadísticas (filtradas)
+    def stats_filter_query(where_clause, params):
+        c.execute(where_clause, params)
+        return c.fetchall()
+
     if ciclo_para_consultar:
         cid = ciclo_para_consultar
         c.execute("SELECT COUNT(*) AS total FROM mantenimiento WHERE ciclo_id=%s", (cid,))
@@ -623,8 +749,52 @@ def principal():
         meses_data = c.fetchall()
         meses_labels = [r['mes'] for r in meses_data]
         meses_counts = [r['count'] for r in meses_data]
+    elif empresa_id_session:
+        eid = empresa_id_session
+        c.execute("SELECT COUNT(*) AS total FROM mantenimiento WHERE empresa_id=%s", (eid,))
+        total_mantenimientos = c.fetchone()['total']
+
+        c.execute("SELECT COUNT(DISTINCT tecnico) AS total_tecnicos FROM mantenimiento WHERE empresa_id=%s", (eid,))
+        total_tecnicos = c.fetchone()['total_tecnicos']
+
+        mes_actual = date.today().strftime("%Y-%m")
+        c.execute("SELECT COUNT(*) AS total_mes FROM mantenimiento WHERE empresa_id=%s AND fecha LIKE %s", (eid, f"{mes_actual}%"))
+        mantenimientos_mes = c.fetchone()['total_mes']
+
+        c.execute("""SELECT tipo_equipo, COUNT(*) AS cantidad 
+                     FROM mantenimiento 
+                     WHERE empresa_id=%s
+                     GROUP BY tipo_equipo 
+                     ORDER BY cantidad DESC LIMIT 1""", (eid,))
+        equipo_mas_comun = c.fetchone()
+        equipo_mas_comun = equipo_mas_comun['tipo_equipo'] if equipo_mas_comun else 'N/A'
+
+        c.execute("SELECT marca, COUNT(*) FROM mantenimiento WHERE empresa_id=%s GROUP BY marca ORDER BY COUNT(*) DESC LIMIT 6", (eid,))
+        marcas_data = c.fetchall()
+        marca_labels = [r['marca'] for r in marcas_data]
+        marca_counts = [r['count'] for r in marcas_data]
+        marca_mas_comun = marcas_data[0]['marca'] if marcas_data else 'N/A'
+
+        c.execute("SELECT sede, COUNT(*) FROM mantenimiento WHERE empresa_id=%s GROUP BY sede ORDER BY sede", (eid,))
+        sedes_data = c.fetchall()
+        sede_labels = [r['sede'] for r in sedes_data]
+        sede_counts = [r['count'] for r in sedes_data]
+
+        c.execute("SELECT tipo_equipo, COUNT(*) FROM mantenimiento WHERE empresa_id=%s GROUP BY tipo_equipo", (eid,))
+        equipos_data = c.fetchall()
+        equipo_labels = [r['tipo_equipo'] for r in equipos_data]
+        equipo_counts = [r['count'] for r in equipos_data]
+
+        c.execute("""SELECT TO_CHAR(TO_DATE(fecha, 'YYYY-MM-DD'), 'Mon') AS mes, COUNT(*) 
+                     FROM mantenimiento 
+                     WHERE empresa_id=%s AND fecha IS NOT NULL
+                     GROUP BY mes 
+                     ORDER BY MIN(fecha)""", (eid,))
+        meses_data = c.fetchall()
+        meses_labels = [r['mes'] for r in meses_data]
+        meses_counts = [r['count'] for r in meses_data]
     else:
-        # comportamiento anterior (global)
+        # global (sin filtro de empresa)
         c.execute("SELECT COUNT(*) AS total FROM mantenimiento")
         total_mantenimientos = c.fetchone()['total']
 
@@ -691,7 +861,6 @@ def principal():
                            meses_labels=meses_labels,
                            meses_counts=meses_counts)
 
-
 @app.route('/consultar_registro')
 @login_required
 def consultar():
@@ -704,8 +873,15 @@ def consultar():
     conn = get_db_connection()
     c = conn.cursor()
 
+    # Aplicar filtro por empresa de sesión
+    empresa_id_session = session.get('empresa_id')
+
     query = "SELECT * FROM mantenimiento WHERE 1=1"
     params = []
+
+    if empresa_id_session:
+        query += " AND empresa_id=%s"
+        params.append(empresa_id_session)
 
     if search:
         like = f"%{search}%"
@@ -743,7 +919,6 @@ def consultar():
                            page=page,
                            total_pages=total_pages)
 
-
 @app.route('/obtener_registro/<int:rid>')
 @login_required
 def obtener_registro(rid):
@@ -756,11 +931,9 @@ def obtener_registro(rid):
     if registro and registro.get('ciclo_id'):
         c.execute("SELECT activo FROM ciclos WHERE id=%s", (registro['ciclo_id'],))
         ciclo = c.fetchone()
-        # si ciclo no existe o está inactivo, consideramos cerrado
         if not ciclo or not ciclo['activo']:
             registro['cerrado'] = True
         else:
-            # mantener la columna cerrado si está en DB
             registro['cerrado'] = registro.get('cerrado', False)
 
     conn.close()
@@ -771,13 +944,11 @@ def obtener_registro(rid):
 
     return render_template('editar.html', registro=registro)
 
-
 @app.route('/actualizar/<int:rid>', methods=['POST'])
 @login_required
 def actualizar_registro(rid):
     conn = get_db_connection()
     c = conn.cursor()
-    # verificar si el registro está marcado como cerrado
     c.execute("SELECT ciclo_id, cerrado FROM mantenimiento WHERE id=%s", (rid,))
     row = c.fetchone()
     if not row:
@@ -785,7 +956,6 @@ def actualizar_registro(rid):
         flash('Registro no encontrado', 'warning')
         return redirect(url_for('principal'))
 
-    # Si el registro pertenece a un ciclo cerrado o su flag cerrado=True, bloquear edición
     ciclo_id = row.get('ciclo_id')
     if row.get('cerrado'):
         conn.close()
@@ -817,13 +987,11 @@ def actualizar_registro(rid):
     flash('✅ Registro actualizado correctamente', 'success')
     return redirect(url_for('principal'))
 
-
 @app.route('/eliminar/<int:rid>', methods=['POST'])
 @admin_required
 def eliminar(rid):
     conn = get_db_connection()
     c = conn.cursor()
-    # comprobar cerrado
     c.execute("SELECT ciclo_id, cerrado FROM mantenimiento WHERE id=%s", (rid,))
     row = c.fetchone()
     if not row:
@@ -850,13 +1018,18 @@ def eliminar(rid):
     flash('Registro eliminado', 'info')
     return redirect(url_for('principal'))
 
-
 @app.route('/exportar')
 @admin_required
 def exportar():
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM mantenimiento ORDER BY fecha DESC")
+
+    # Si hay empresa en sesión, exportar solo esa empresa
+    empresa_id_session = session.get('empresa_id')
+    if empresa_id_session:
+        c.execute("SELECT * FROM mantenimiento WHERE empresa_id=%s ORDER BY fecha DESC", (empresa_id_session,))
+    else:
+        c.execute("SELECT * FROM mantenimiento ORDER BY fecha DESC")
     registros = c.fetchall()
     conn.close()
 
@@ -879,7 +1052,6 @@ def exportar():
                      download_name='Mantenimiento.xlsx',
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
-
 @app.route('/acta/<int:rid>')
 @login_required
 def acta_pdf(rid):
@@ -897,73 +1069,72 @@ def acta_pdf(rid):
     c_pdf = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
 
-    # === Encabezado con logo y título ===
-    logo_path = "static/img/logo.png"  # <-- Coloca aquí la ruta del logo (por ejemplo, en static/img/)
-    if os.path.exists(logo_path):
-        c_pdf.drawImage(logo_path, 50, height - 100, width=100, preserveAspectRatio=True, mask='auto')
-
+    # Encabezado profesional (sin logo por ahora)
     c_pdf.setFont("Helvetica-Bold", 16)
-    c_pdf.drawString(180, height - 60, "ACTA DE MANTENIMIENTO TÉCNICO")
+    c_pdf.drawString(50, height - 50, "ACTA DE MANTENIMIENTO TÉCNICO")
     c_pdf.setFont("Helvetica", 10)
-    c_pdf.drawString(180, height - 75, f"Fecha de emisión: {date.today().isoformat()}")
-    c_pdf.line(50, height - 85, width - 50, height - 85)
+    c_pdf.drawString(50, height - 70, f"ID: {registro['id']}    Fecha emisión: {date.today().isoformat()}")
+    c_pdf.line(50, height - 75, width - 50, height - 75)
 
-    # === Datos generales ===
-    y = height - 120
+    # Datos generales
+    y = height - 95
     c_pdf.setFont("Helvetica-Bold", 12)
     c_pdf.drawString(50, y, "I. DATOS GENERALES")
-    y -= 15
+    y -= 18
     c_pdf.setFont("Helvetica", 11)
-    c_pdf.drawString(60, y, f"Sede: {registro['sede']}")
+    c_pdf.drawString(60, y, f"Sede: {registro.get('sede','N/A')}")
     y -= 15
-    c_pdf.drawString(60, y, f"Área: {registro['area']}")
+    c_pdf.drawString(60, y, f"Área: {registro.get('area','N/A')}")
     y -= 15
-    c_pdf.drawString(60, y, f"Técnico responsable: {registro['tecnico']}")
+    c_pdf.drawString(60, y, f"Técnico responsable: {registro.get('tecnico','N/A')}")
     y -= 15
-    c_pdf.drawString(60, y, f"Fecha del mantenimiento: {registro['fecha']}")
+    c_pdf.drawString(60, y, f"Fecha del mantenimiento: {registro.get('fecha','N/A')}")
 
-    # === Datos del equipo ===
-    y -= 30
+    # Datos del equipo
+    y -= 25
     c_pdf.setFont("Helvetica-Bold", 12)
     c_pdf.drawString(50, y, "II. DATOS DEL EQUIPO")
-    y -= 15
+    y -= 18
     c_pdf.setFont("Helvetica", 11)
     equipo_datos = [
-        ("Nombre del equipo", registro['nombre_maquina']),
-        ("Usuario", registro['usuario']),
-        ("Tipo", registro['tipo_equipo']),
-        ("Marca", registro['marca']),
-        ("Modelo", registro['modelo']),
-        ("Serial", registro['serial']),
-        ("Activo fijo", registro['activo_fijo']),
+        ("Nombre del equipo", registro.get('nombre_maquina')),
+        ("Usuario", registro.get('usuario')),
+        ("Tipo", registro.get('tipo_equipo')),
+        ("Marca", registro.get('marca')),
+        ("Modelo", registro.get('modelo')),
+        ("Serial", registro.get('serial')),
+        ("Activo fijo", registro.get('activo_fijo')),
     ]
     for campo, valor in equipo_datos:
         c_pdf.drawString(60, y, f"{campo}: {valor or 'N/A'}")
         y -= 15
+        if y < 100:
+            c_pdf.showPage()
+            y = height - 100
 
-    # === Software instalado ===
-    y -= 20
+    # Software
+    y -= 15
     c_pdf.setFont("Helvetica-Bold", 12)
     c_pdf.drawString(50, y, "III. SOFTWARE Y HERRAMIENTAS")
-    y -= 15
+    y -= 18
     c_pdf.setFont("Helvetica", 11)
-    c_pdf.drawString(60, y, f"Sistema Operativo: {registro['sistema_operativo']}")
+    c_pdf.drawString(60, y, f"Sistema Operativo: {registro.get('sistema_operativo','N/A')}")
     y -= 15
-    c_pdf.drawString(60, y, f"Office: {registro['office']}")
+    c_pdf.drawString(60, y, f"Office: {registro.get('office','N/A')}")
     y -= 15
-    c_pdf.drawString(60, y, f"Antivirus: {registro['antivirus']}")
+    c_pdf.drawString(60, y, f"Antivirus: {registro.get('antivirus','N/A')}")
     y -= 15
-    c_pdf.drawString(60, y, f"Compresor: {registro['compresor']}")
+    c_pdf.drawString(60, y, f"Compresor: {registro.get('compresor','N/A')}")
     y -= 15
-    c_pdf.drawString(60, y, f"Control Remoto: {registro['control_remoto']}")
+    c_pdf.drawString(60, y, f"Control Remoto: {registro.get('control_remoto','N/A')}")
 
-    # === Observaciones ===
+    # Observaciones
     y -= 25
     c_pdf.setFont("Helvetica-Bold", 12)
     c_pdf.drawString(50, y, "IV. OBSERVACIONES")
-    y -= 15
+    y -= 18
     c_pdf.setFont("Helvetica", 11)
-    texto = registro['observaciones'] or "Sin observaciones."
+    texto = registro.get('observaciones') or "Sin observaciones."
     for linea in texto.splitlines():
         c_pdf.drawString(60, y, linea)
         y -= 15
@@ -971,7 +1142,7 @@ def acta_pdf(rid):
             c_pdf.showPage()
             y = height - 100
 
-    # === Firma ===
+    # Firmas
     y -= 40
     c_pdf.setFont("Helvetica-Bold", 12)
     c_pdf.drawString(50, y, "V. FIRMAS")
@@ -983,7 +1154,7 @@ def acta_pdf(rid):
     c_pdf.drawString(120, y, "Técnico responsable")
     c_pdf.drawString(390, y, "Usuario del equipo")
 
-    # Pie de página
+    # Pie
     c_pdf.setFont("Helvetica-Oblique", 9)
     c_pdf.setFillColor(colors.grey)
     c_pdf.drawString(50, 40, "Sistema de Gestión de Mantenimiento - Informe Técnico Generado Automáticamente")
@@ -995,149 +1166,99 @@ def acta_pdf(rid):
     return send_file(buffer, as_attachment=True,
                      download_name=f"Acta_Mantenimiento_{registro['id']}.pdf",
                      mimetype='application/pdf')
-# ============================================================
-# ADMINISTRACIÓN DE CICLOS TRIMESTRALES
-# ============================================================
-@app.route('/admin_ciclos', methods=['GET', 'POST'])
-@admin_required
-def admin_ciclos():
-    conn = get_db_connection()
-    c = conn.cursor()
 
-    # Crear nuevo ciclo
-    if request.method == 'POST' and request.form.get('action') == 'nuevo':
-        # Cerrar ciclo anterior si existe
-        c.execute("UPDATE ciclos SET activo=FALSE, fecha_cierre=%s WHERE activo=TRUE", (date.today(),))
-
-        nombre = request.form.get('nombre', f"Ciclo {date.today().strftime('%b %Y')}")
-        trimestre = request.form.get('trimestre', 1)
-        anio = request.form.get('anio', date.today().year)
-        fecha_inicio = request.form.get('fecha_inicio', date.today())
-        observaciones = request.form.get('observaciones', '')
-
-        c.execute("""INSERT INTO ciclos (nombre, trimestre, anio, fecha_inicio, observaciones, activo)
-                     VALUES (%s, %s, %s, %s, %s, TRUE)""",
-                  (nombre, trimestre, anio, fecha_inicio, observaciones))
-        conn.commit()
-        flash('✅ Nuevo ciclo creado correctamente', 'success')
-        conn.close()
-        return redirect(url_for('admin_ciclos'))
-
-    # Cerrar ciclo activo
-    if request.method == 'POST' and request.form.get('action') == 'cerrar':
-        c.execute("SELECT id FROM ciclos WHERE activo=TRUE ORDER BY id DESC LIMIT 1")
-        ciclo_activo = c.fetchone()
-        if ciclo_activo:
-            c.execute("UPDATE ciclos SET activo=FALSE, fecha_cierre=%s WHERE id=%s", (date.today(), ciclo_activo['id']))
-            c.execute("UPDATE mantenimiento SET cerrado=TRUE WHERE ciclo_id=%s", (ciclo_activo['id'],))
-            conn.commit()
-            flash('🔒 Ciclo cerrado exitosamente', 'info')
-        else:
-            flash('No hay ciclo activo para cerrar', 'warning')
-        conn.close()
-        return redirect(url_for('admin_ciclos'))
-
-    # Mostrar todos los ciclos
-    c.execute("SELECT * FROM ciclos ORDER BY id DESC")
-    ciclos = c.fetchall()
-    conn.close()
-    return render_template('admin_ciclos.html', ciclos=ciclos)
-
-
+# Ver ciclo detalle
 @app.route('/ver_ciclo/<int:ciclo_id>')
 @admin_required
 def ver_ciclo(ciclo_id):
     conn = get_db_connection()
     c = conn.cursor()
+
+    # Obtener ciclo
     c.execute("SELECT * FROM ciclos WHERE id=%s", (ciclo_id,))
     ciclo = c.fetchone()
 
-    c.execute("SELECT * FROM mantenimiento WHERE ciclo_id=%s ORDER BY fecha ASC", (ciclo_id,))
-    registros = c.fetchall()
-    conn.close()
-
     if not ciclo:
+        conn.close()
         flash('Ciclo no encontrado', 'warning')
         return redirect(url_for('admin_ciclos'))
 
-    return render_template('ver_ciclo.html', ciclo=ciclo, registros=registros)
+    # Obtener empresa asociada (si existe)
+    empresa = None
+    if 'empresa_id' in ciclo and ciclo['empresa_id']:
+        c.execute("SELECT * FROM empresas WHERE id=%s", (ciclo['empresa_id'],))
+        empresa = c.fetchone()
 
+    # Obtener mantenimientos del ciclo
+    c.execute("SELECT * FROM mantenimiento WHERE ciclo_id=%s ORDER BY fecha ASC", (ciclo_id,))
+    registros = c.fetchall()
+
+    conn.close()
+
+    return render_template('ver_ciclo.html', ciclo=ciclo, registros=registros, empresa=empresa)
+
+# Editar ciclo (solo admin y solo si está abierto)
 @app.route('/editar_ciclo/<int:ciclo_id>', methods=['GET', 'POST'])
 @login_required
 def editar_ciclo(ciclo_id):
-    if session.get('rol') != 'admin':
-        flash("Acceso no autorizado", "danger")
-        return redirect(url_for('principal'))
-
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM ciclos WHERE id=%s", (ciclo_id,))
+
+    # Obtener datos del ciclo
+    c.execute("""
+        SELECT c.*, e.nombre AS empresa_nombre
+        FROM ciclos c
+        LEFT JOIN empresas e ON c.empresa_id = e.id
+        WHERE c.id = %s
+    """, (ciclo_id,))
     ciclo = c.fetchone()
 
     if not ciclo:
+        flash('Ciclo no encontrado.', 'danger')
         conn.close()
-        flash("Ciclo no encontrado", "warning")
         return redirect(url_for('admin_ciclos'))
 
-    # Si el ciclo está cerrado, no permitir edición
+    # Verificar si el ciclo está cerrado
     if not ciclo['activo']:
+        flash('No se puede editar un ciclo cerrado.', 'warning')
         conn.close()
-        flash("No puedes modificar un ciclo cerrado.", "warning")
         return redirect(url_for('admin_ciclos'))
 
-    # Si envía formulario
-    if request.method == 'POST':
-        nombre = request.form.get('nombre')
-        trimestre = request.form.get('trimestre')
-        anio = request.form.get('anio')
-        fecha_inicio = request.form.get('fecha_inicio')
-        fecha_cierre = request.form.get('fecha_cierre') or None
-        observaciones = request.form.get('observaciones')
+    # Obtener lista de empresas para el selector
+    c.execute("SELECT id, nombre FROM empresas ORDER BY nombre")
+    empresas = c.fetchall()
 
+    # Si el formulario fue enviado (POST)
+    if request.method == 'POST':
+        nombre = request.form.get('nombre', '').strip()
+        trimestre = request.form.get('trimestre', None)
+        anio = request.form.get('anio', None)
+        fecha_inicio = request.form.get('fecha_inicio', None)
+        fecha_cierre = request.form.get('fecha_cierre', None)
+        observaciones = request.form.get('observaciones', '').strip()
+        empresa_id = request.form.get('empresa_id')
+
+        # Validaciones mínimas
+        if not trimestre or not anio or not fecha_inicio:
+            flash('Por favor completa los campos obligatorios.', 'warning')
+            conn.close()
+            return render_template('editar_ciclo.html', ciclo=ciclo, empresas=empresas)
+
+        # Actualizar ciclo
         c.execute("""
-            UPDATE ciclos 
-            SET nombre=%s, trimestre=%s, anio=%s, fecha_inicio=%s, fecha_cierre=%s, observaciones=%s
+            UPDATE ciclos
+            SET nombre=%s, trimestre=%s, anio=%s, fecha_inicio=%s, fecha_cierre=%s,
+                observaciones=%s, empresa_id=%s
             WHERE id=%s
-        """, (nombre, trimestre, anio, fecha_inicio, fecha_cierre, observaciones, ciclo_id))
+        """, (nombre, trimestre, anio, fecha_inicio, fecha_cierre, observaciones, empresa_id, ciclo_id))
+
         conn.commit()
         conn.close()
-        flash("Ciclo actualizado correctamente", "success")
+        flash('Ciclo actualizado correctamente.', 'success')
         return redirect(url_for('admin_ciclos'))
 
     conn.close()
-    return render_template("editar_ciclo.html", ciclo=ciclo)
-
-@app.route('/admin/ciclos/asociar/<int:ciclo_id>', methods=['POST'])
-@admin_required
-def asociar_mantenimientos_a_ciclo(ciclo_id):
-    """Asocia todos los mantenimientos sin ciclo al ciclo especificado."""
-    conn = get_db_connection()
-    c = conn.cursor()
-
-    # Verificar si el ciclo existe
-    c.execute("SELECT * FROM ciclos WHERE id=%s", (ciclo_id,))
-    ciclo = c.fetchone()
-    if not ciclo:
-        conn.close()
-        flash("❌ El ciclo seleccionado no existe.", "danger")
-        return redirect(url_for('admin_ciclos'))
-
-    # Contar mantenimientos sin ciclo
-    c.execute("SELECT COUNT(*) FROM mantenimiento WHERE ciclo_id IS NULL")
-    total_sin_ciclo = c.fetchone()['count']
-
-    if total_sin_ciclo == 0:
-        conn.close()
-        flash("✅ No hay mantenimientos pendientes por asociar.", "info")
-        return redirect(url_for('admin_ciclos'))
-
-    # Actualizar mantenimientos sin ciclo
-    c.execute("UPDATE mantenimiento SET ciclo_id=%s WHERE ciclo_id IS NULL", (ciclo_id,))
-    conn.commit()
-    conn.close()
-
-    flash(f"🧾 {total_sin_ciclo} mantenimientos fueron asociados al ciclo '{ciclo['nombre']}'.", "success")
-    return redirect(url_for('admin_ciclos'))
+    return render_template('editar_ciclo.html', ciclo=ciclo, empresas=empresas)
 
 # -----------------------
 # Main

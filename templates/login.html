@@ -78,6 +78,14 @@
         <label class="form-label">Contraseña</label>
         <input type="password" name="contrasena" class="form-control" placeholder="••••••••" required>
       </div>
+      <div class="mb-3">
+        <label for="empresa" class="form-label">Seleccionar empresa</label>
+        <select name="empresa_id" class="form-select" required>
+          {% for e in empresas %}
+            <option value="{{ e.id }}">{{ e.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
       <button type="submit" class="btn btn-primary">Ingresar</button>
     </form>
 
