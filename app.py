@@ -512,13 +512,26 @@ def principal():
     conn = get_db_connection()
     c = conn.cursor()
 
-    # Obtener ciclo activo (si existe)
+    # Obtener todos los ciclos para el menú (solo visible para admin)
+    c.execute("SELECT * FROM ciclos ORDER BY id DESC")
+    ciclos = c.fetchall()
+
+    # Ciclo activo (por defecto)
     ciclo_activo = get_active_cycle(conn)
 
+    # Permitir seleccionar ciclo manualmente (solo vista)
+    ciclo_id_param = request.args.get('ciclo_id', type=int)
+    ciclo_seleccionado = None
+    if ciclo_id_param:
+        c.execute("SELECT * FROM ciclos WHERE id=%s", (ciclo_id_param,))
+        ciclo_seleccionado = c.fetchone()
+    if not ciclo_seleccionado:
+        ciclo_seleccionado = ciclo_activo
+
+    # Si el usuario guarda un mantenimiento
     if request.method == 'POST' and request.form.get('action') == 'guardar':
-        # Si no hay ciclo activo, no permitimos guardar (según tu requerimiento de ciclos manuales)
         if not ciclo_activo:
-            flash('No hay un ciclo activo. Contacta al administrador para abrir un ciclo antes de registrar mantenimientos.', 'warning')
+            flash('⚠️ No hay un ciclo activo. Contacta al administrador para abrir un ciclo antes de registrar mantenimientos.', 'warning')
             conn.close()
             return redirect(url_for('principal'))
 
@@ -540,32 +553,34 @@ def principal():
             request.form.get('control_remoto', ''),
             request.form.get('activo_fijo', ''),
             request.form.get('observaciones', ''),
-            ciclo_activo['id']  # ciclo_id
+            ciclo_activo['id']
         )
         c.execute('''INSERT INTO mantenimiento
                     (sede, fecha, area, tecnico, nombre_maquina, usuario, tipo_equipo, marca, modelo, serial,
                      sistema_operativo, office, antivirus, compresor, control_remoto, activo_fijo, observaciones, ciclo_id)
                      VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''', datos)
         conn.commit()
-        flash('Registro guardado correctamente', 'success')
+        flash('✅ Registro guardado correctamente', 'success')
 
-    # Últimos registros — solo del ciclo activo si existe, sino últimos globales
-    if ciclo_activo:
-        c.execute("SELECT * FROM mantenimiento WHERE ciclo_id=%s ORDER BY id DESC LIMIT 10", (ciclo_activo['id'],))
+    # Determinar de qué ciclo mostrar los registros
+    ciclo_para_consultar = ciclo_seleccionado['id'] if ciclo_seleccionado else None
+
+    # Últimos registros del ciclo seleccionado o globales
+    if ciclo_para_consultar:
+        c.execute("SELECT * FROM mantenimiento WHERE ciclo_id=%s ORDER BY id DESC LIMIT 10", (ciclo_para_consultar,))
     else:
         c.execute("SELECT * FROM mantenimiento ORDER BY id DESC LIMIT 10")
     registros = c.fetchall()
 
-    # Dashboard: si hay ciclo activo, métricas por ciclo; si no, métricas globales
-    if ciclo_activo:
-        cid = ciclo_activo['id']
+    # Estadísticas: si hay ciclo seleccionado, filtra por él
+    if ciclo_para_consultar:
+        cid = ciclo_para_consultar
         c.execute("SELECT COUNT(*) AS total FROM mantenimiento WHERE ciclo_id=%s", (cid,))
         total_mantenimientos = c.fetchone()['total']
 
         c.execute("SELECT COUNT(DISTINCT tecnico) AS total_tecnicos FROM mantenimiento WHERE ciclo_id=%s", (cid,))
         total_tecnicos = c.fetchone()['total_tecnicos']
 
-        # mantenimientos del mes (relativo al ciclo activo — simple aproximación por mes actual)
         mes_actual = date.today().strftime("%Y-%m")
         c.execute("SELECT COUNT(*) AS total_mes FROM mantenimiento WHERE ciclo_id=%s AND fecha LIKE %s", (cid, f"{mes_actual}%"))
         mantenimientos_mes = c.fetchone()['total_mes']
@@ -649,23 +664,26 @@ def principal():
     conn.close()
 
     return render_template('principal.html',
-                       registros=registros,
-                       nombre=session.get('nombre'),
-                       rol=session.get('rol'),
-                       hoy=date.today().isoformat(),
-                       total_mantenimientos=total_mantenimientos,
-                       total_tecnicos=total_tecnicos,
-                       mantenimientos_mes=mantenimientos_mes,
-                       equipo_mas_comun=equipo_mas_comun,
-                       marca_mas_comun=marca_mas_comun,
-                       sede_labels=sede_labels,
-                       sede_counts=sede_counts,
-                       equipo_labels=equipo_labels,
-                       equipo_counts=equipo_counts,
-                       marca_labels=marca_labels,
-                       marca_counts=marca_counts,
-                       meses_labels=meses_labels,
-                       meses_counts=meses_counts)
+                           registros=registros,
+                           nombre=session.get('nombre'),
+                           rol=session.get('rol'),
+                           hoy=date.today().isoformat(),
+                           ciclos=ciclos,
+                           ciclo_activo=ciclo_activo,
+                           ciclo_seleccionado=ciclo_seleccionado,
+                           total_mantenimientos=total_mantenimientos,
+                           total_tecnicos=total_tecnicos,
+                           mantenimientos_mes=mantenimientos_mes,
+                           equipo_mas_comun=equipo_mas_comun,
+                           marca_mas_comun=marca_mas_comun,
+                           sede_labels=sede_labels,
+                           sede_counts=sede_counts,
+                           equipo_labels=equipo_labels,
+                           equipo_counts=equipo_counts,
+                           marca_labels=marca_labels,
+                           marca_counts=marca_counts,
+                           meses_labels=meses_labels,
+                           meses_counts=meses_counts)
 
 
 @app.route('/consultar_registro')
