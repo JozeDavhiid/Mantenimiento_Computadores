@@ -203,16 +203,8 @@ def login():
     conn = get_db_connection()
     c = conn.cursor()
 
-    # Aseguramos existencia de empresas (por si alguien eliminó)
-    c.execute("SELECT COUNT(*) FROM empresas")
-    if c.fetchone()['count'] == 0:
-        empresas_default = ['Cuidado Seguro en Casa', 'iCare IPS', 'Dotarmedica', 'Movired']
-        for e in empresas_default:
-            c.execute("INSERT INTO empresas (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING", (e,))
-        conn.commit()
-
-    # Obtener empresas para select en login
-    c.execute("SELECT id, nombre FROM empresas ORDER BY nombre")
+    # 🔹 Obtener listado de empresas para mostrar en el select
+    c.execute("SELECT id, nombre FROM empresas ORDER BY nombre ASC")
     empresas = c.fetchall()
 
     if request.method == 'POST':
@@ -220,28 +212,35 @@ def login():
         contrasena = request.form['contrasena'].strip()
         empresa_id = request.form.get('empresa_id')
 
-        if not empresa_id:
-            flash('Selecciona una empresa', 'warning')
+        # Validar datos
+        if not usuario or not contrasena or not empresa_id:
+            flash("Debes completar todos los campos, incluyendo la empresa.", "warning")
             conn.close()
-            return render_template('login.html', empresas=empresas)
+            return render_template("login.html", empresas=empresas)
 
+        # Buscar usuario
         c.execute("SELECT usuario, nombre, correo, contrasena, rol FROM tecnicos WHERE usuario=%s", (usuario,))
         row = c.fetchone()
 
         if row and row['contrasena'] == contrasena:
+            # Guardar datos de sesión
             session['usuario'] = row['usuario']
             session['nombre'] = row['nombre']
             session['rol'] = row.get('rol', 'tecnico')
-            session['empresa_id'] = int(empresa_id)
-            # guardar nombre empresa
+            session['empresa_id'] = int(empresa_id)  # 🔹 Guardamos empresa actual
+
+            # Obtener nombre de empresa para mostrar en mensajes o panel
             c.execute("SELECT nombre FROM empresas WHERE id=%s", (empresa_id,))
-            emp = c.fetchone()
-            session['empresa_nombre'] = emp['nombre'] if emp else 'Sin Empresa'
+            empresa = c.fetchone()
+            session['empresa_nombre'] = empresa['nombre'] if empresa else 'Sin empresa'
+
             conn.close()
-            flash(f"Bienvenido {row['nombre']} ({session['empresa_nombre']})", 'success')
+            flash(f"Bienvenido {row['nombre']} - {session['empresa_nombre']}", "success")
             return redirect(url_for('principal'))
 
+        conn.close()
         flash('Usuario o contraseña incorrectos', 'danger')
+        return render_template('login.html', empresas=empresas)
 
     conn.close()
     return render_template('login.html', empresas=empresas)
