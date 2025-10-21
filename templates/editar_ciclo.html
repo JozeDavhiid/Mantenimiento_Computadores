@@ -38,16 +38,9 @@
                     <input type="date" name="fecha_cierre" class="form-control" value="{{ ciclo.fecha_cierre or '' }}">
                 </div>
 
-                <!-- NUEVO: selector de empresa -->
                 <div class="col-md-4">
                     <label class="form-label">Empresa</label>
-                    <select name="empresa_id" class="form-select" required>
-                        {% for e in empresas %}
-                            <option value="{{ e.id }}" {% if e.id == ciclo.empresa_id %}selected{% endif %}>
-                                {{ e.nombre }}
-                            </option>
-                        {% endfor %}
-                    </select>
+                    <input type="text" class="form-control" value="{{ empresa_nombre }}" readonly>
                 </div>
 
                 <div class="col-12">

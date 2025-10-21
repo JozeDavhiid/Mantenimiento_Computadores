@@ -1157,7 +1157,7 @@ def editar_ciclo(ciclo_id):
     conn = get_db_connection()
     c = conn.cursor()
 
-    # Obtener datos del ciclo
+    # Obtener ciclo con la empresa asociada
     c.execute("""
         SELECT c.*, e.nombre AS empresa_nombre
         FROM ciclos c
@@ -1177,11 +1177,19 @@ def editar_ciclo(ciclo_id):
         conn.close()
         return redirect(url_for('admin_ciclos'))
 
-    # Obtener lista de empresas para el selector
+    # ✅ Usar la empresa activa en sesión
+    empresa_id_sesion = session.get('empresa_id')
+    empresa_nombre_sesion = session.get('empresa_nombre')
+
+    # Si no hay empresa en sesión, usar la del ciclo
+    if not empresa_id_sesion:
+        empresa_id_sesion = ciclo.get('empresa_id')
+        empresa_nombre_sesion = ciclo.get('empresa_nombre')
+
+    # Obtener lista de empresas (solo para mostrar, no para seleccionar)
     c.execute("SELECT id, nombre FROM empresas ORDER BY nombre")
     empresas = c.fetchall()
 
-    # Si el formulario fue enviado (POST)
     if request.method == 'POST':
         nombre = request.form.get('nombre', '').strip()
         trimestre = request.form.get('trimestre', None)
@@ -1189,33 +1197,41 @@ def editar_ciclo(ciclo_id):
         fecha_inicio = request.form.get('fecha_inicio', None)
         fecha_cierre = request.form.get('fecha_cierre', None)
         observaciones = request.form.get('observaciones', '').strip()
-        empresa_id = request.form.get('empresa_id')
 
-        # ✅ Convertir fecha_cierre vacía a None (NULL en PostgreSQL)
-        if fecha_cierre == '':
-            fecha_cierre = None
+        # Evitar error si la fecha_cierre está vacía
+        fecha_cierre = fecha_cierre if fecha_cierre else None
 
-        # ✅ Validaciones mínimas
+        # Validaciones mínimas
         if not trimestre or not anio or not fecha_inicio:
             flash('Por favor completa los campos obligatorios.', 'warning')
             conn.close()
-            return render_template('editar_ciclo.html', ciclo=ciclo, empresas=empresas)
+            return render_template(
+                'editar_ciclo.html',
+                ciclo=ciclo,
+                empresas=empresas,
+                empresa_nombre=empresa_nombre_sesion
+            )
 
-        # ✅ Actualizar ciclo
+        # ✅ Actualizar el ciclo con la empresa de la sesión
         c.execute("""
             UPDATE ciclos
             SET nombre=%s, trimestre=%s, anio=%s, fecha_inicio=%s, fecha_cierre=%s,
                 observaciones=%s, empresa_id=%s
             WHERE id=%s
-        """, (nombre, trimestre, anio, fecha_inicio, fecha_cierre, observaciones, empresa_id, ciclo_id))
+        """, (nombre, trimestre, anio, fecha_inicio, fecha_cierre, observaciones, empresa_id_sesion, ciclo_id))
 
         conn.commit()
         conn.close()
         flash('Ciclo actualizado correctamente.', 'success')
-        return redirect(url_for('admin_ciclos'))
+        return redirect(url_for('admin_ciclos', empresa_id=empresa_id_sesion))
 
     conn.close()
-    return render_template('editar_ciclo.html', ciclo=ciclo, empresas=empresas)
+    return render_template(
+        'editar_ciclo.html',
+        ciclo=ciclo,
+        empresas=empresas,
+        empresa_nombre=empresa_nombre_sesion
+    )
 
 # -----------------------
 # Main
