@@ -55,55 +55,6 @@
     {% endif %}
   {% endwith %}
 
-  <!-- CICLO ACTIVO -->
-  {% if ciclo_activo %}
-  <div class="alert alert-success d-flex justify-content-between align-items-center shadow-sm flex-wrap">
-    <div>
-      <strong>📅 Ciclo activo:</strong>
-      {{ ciclo_activo.nombre or 'Sin nombre' }}
-      — Trimestre {{ ciclo_activo.trimestre or '—' }} ({{ ciclo_activo.anio or '—' }})
-      <br>
-      <small>Inicio: {{ ciclo_activo.fecha_inicio or '—' }} | Cierre: {{ ciclo_activo.fecha_cierre or '—' }}</small>
-    </div>
-    <div class="d-flex gap-2 mt-2 mt-md-0">
-      {% if rol == 'admin' %}
-        <a href="{{ url_for('admin_ciclos') }}" class="btn btn-outline-light btn-sm">⚙️ Administrar Ciclos</a>
-      {% endif %}
-      <a href="{{ url_for('consultar') }}" class="btn btn-light btn-sm">🔎 Ver Registros</a>
-    </div>
-  </div>
-  {% else %}
-  <div class="alert alert-warning d-flex justify-content-between align-items-center shadow-sm">
-    <div>
-      ⚠️ <strong>No hay un ciclo activo.</strong>
-      <div class="small">Para registrar mantenimientos, un administrador debe activar un ciclo.</div>
-    </div>
-    {% if rol == 'admin' %}
-    <a href="{{ url_for('admin_ciclos') }}" class="btn btn-dark btn-sm">➕ Crear / Activar Ciclo</a>
-    {% endif %}
-  </div>
-  {% endif %}
-
-  {% if rol == 'admin' and ciclos %}
-  <div class="card shadow-sm mb-4">
-    <div class="card-body d-flex flex-wrap align-items-center justify-content-between">
-      <form method="GET" class="d-flex align-items-center gap-2 flex-wrap">
-        <label class="fw-bold me-2 mb-0">📘 Ver datos del ciclo:</label>
-        <select name="ciclo_id" class="form-select">
-          {% for c in ciclos %}
-            <option value="{{ c.id }}" {% if ciclo_seleccionado and ciclo_seleccionado.id == c.id %}selected{% endif %}>
-              {{ c.nombre or 'Sin nombre' }} — T{{ c.trimestre or '?' }} {{ c.anio }}
-              {% if c.activo %} (Activo){% else %} (Cerrado){% endif %}
-            </option>
-          {% endfor %}
-        </select>
-        <button type="submit" class="btn btn-outline-primary">Ver</button>
-      </form>
-      <a href="{{ url_for('admin_ciclos') }}" class="btn btn-dark mt-2 mt-md-0">⚙️ Gestionar Ciclos</a>
-    </div>
-  </div>
-  {% endif %}
-
   <!-- FORMULARIO REGISTRO -->
   <div class="card shadow mb-4">
     <div class="card-header bg-primary text-white fw-bold">Registrar Nuevo Mantenimiento</div>
