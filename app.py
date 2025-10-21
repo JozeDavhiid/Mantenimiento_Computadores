@@ -802,6 +802,7 @@ def principal():
                            mantenimientos_mes=mantenimientos_mes,
                            equipo_mas_comun=equipo_mas_comun,
                            marca_mas_comun=marca_mas_comun,
+                           empresa_nombre=session.get('empresa_nombre'),
                            sede_labels=sede_labels,
                            sede_counts=sede_counts,
                            equipo_labels=equipo_labels,
@@ -867,6 +868,7 @@ def consultar():
                            sede_filter=sede_filter,
                            sedes=sedes,
                            page=page,
+                           empresa_nombre=session.get('empresa_nombre'),
                            total_pages=total_pages)
 
 @app.route('/obtener_registro/<int:rid>')
