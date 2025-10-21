@@ -26,7 +26,9 @@
   <div class="container-fluid">
     <a class="navbar-brand fw-bold" href="{{ url_for('principal') }}">🖥️ Mantenimiento</a>
     <div class="d-flex">
-      <span class="navbar-text text-white me-3">👋 {{ session.get('nombre') }}</span>
+      <div class="me-3 text-white small"> 👋 {{ nombre or '' }} 
+        <span class="fw-semibold text-warning ms-2">{{ empresa_nombre or 'Sin empresa' }}</span>
+      </div>
       <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">Cerrar sesión</a>
     </div>
   </div>
