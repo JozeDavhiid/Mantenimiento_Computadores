@@ -260,7 +260,6 @@ def login():
             session['empresa_nombre'] = empresa['nombre'] if empresa else 'Sin empresa'
 
             conn.close()
-            flash(f"Bienvenido {row['nombre']} - {session['empresa_nombre']}", "success")
             return redirect(url_for('principal'))
 
         conn.close()
@@ -636,7 +635,7 @@ def principal():
                     (sede, fecha, area, tecnico, nombre_maquina, usuario, tipo_equipo, marca, modelo, serial,
                      sistema_operativo, office, antivirus, compresor, control_remoto, activo_fijo, observaciones, ciclo_id, empresa_id)
                      VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''', datos)
-        conn.commit()
+        conn.commit()Bienvenido
         flash('Registro guardado correctamente', 'success')
 
     # Determinar ciclo para consultas
