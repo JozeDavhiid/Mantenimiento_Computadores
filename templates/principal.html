@@ -211,18 +211,16 @@
   <div class="container-fluid mt-5">
     <div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
       <h3 class="fw-bold">📊 Dashboard — {{ ciclo_seleccionado.nombre if ciclo_seleccionado else ciclo_activo.nombre if ciclo_activo else "Sin ciclo activo" }}</h3>
-      <!-- {% if rol == 'admin' %} -->
       <form method="GET" class="d-flex gap-2">
         <select name="ciclo_id" class="form-select">
           {% for c in ciclos %}
           <option value="{{ c.id }}" {% if ciclo_seleccionado and ciclo_seleccionado.id == c.id %}selected{% endif %}>
             {{ c.nombre }} ({{ c.anio }}) {% if c.activo %}- Activo{% else %}- Cerrado{% endif %}
           </option>
-          <!-- {% endfor %} -->
+          {% endfor %} 
         </select>
         <button class="btn btn-outline-primary" type="submit">Ver</button>
       </form>
-      {% endif %}
     </div>
 
     <!-- Tarjetas resumen -->
