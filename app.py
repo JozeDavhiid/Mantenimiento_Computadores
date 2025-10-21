@@ -52,11 +52,11 @@ def get_db_connection():
 # Inicializar DB (asegura tablas/columnas)
 # -----------------------
 def init_db():
-    """Inicializa la base de datos con datos base si no existen"""
+    """Inicializa la base de datos (crea tablas y restricciones si no existen, pero sin insertar datos base)."""
     conn = get_db_connection()
     c = conn.cursor()
 
-    # Crear tablas si no existen
+    # Crear tabla de empresas (si no existe)
     c.execute("""
         CREATE TABLE IF NOT EXISTS empresas (
             id SERIAL PRIMARY KEY,
@@ -64,6 +64,7 @@ def init_db():
         );
     """)
 
+    # Crear tabla de ciclos
     c.execute("""
         CREATE TABLE IF NOT EXISTS ciclos (
             id SERIAL PRIMARY KEY,
@@ -78,7 +79,7 @@ def init_db():
         );
     """)
 
-    # Asegurar restricción única por empresa (nombre + empresa_id)
+    # Crear restricción única (nombre + empresa_id)
     c.execute("""
         DO $$
         BEGIN
@@ -90,34 +91,58 @@ def init_db():
         END $$;
     """)
 
-    # Crear empresa base si no existe
-    c.execute("SELECT id FROM empresas WHERE nombre = %s", ('Empresa Base',))
-    empresa = c.fetchone()
-    if not empresa:
-        c.execute("INSERT INTO empresas (nombre) VALUES (%s) RETURNING id", ('Empresa Base',))
-        empresa_base_id = c.fetchone()['id']
-    else:
-        empresa_base_id = empresa['id']
-
-    # Insertar ciclo base solo si no existe en esa empresa
+    # Crear tabla de técnicos si no existe
     c.execute("""
-        SELECT id FROM ciclos
-        WHERE nombre = %s AND empresa_id = %s
-    """, ('Ciclo Ago-Oct 2025', empresa_base_id))
-    if not c.fetchone():
-        c.execute("""
-            INSERT INTO ciclos (nombre, trimestre, anio, fecha_inicio, fecha_cierre, observaciones, activo, empresa_id)
-            VALUES (%s, %s, %s, %s, %s, %s, FALSE, %s)
-        """, (
-            'Ciclo Ago-Oct 2025', 3, 2025,
-            '2025-08-11', '2025-10-09',
-            'Ciclo previo a la implementación de control trimestral',
-            empresa_base_id
-        ))
+        CREATE TABLE IF NOT EXISTS tecnicos (
+            id SERIAL PRIMARY KEY,
+            usuario VARCHAR(50) UNIQUE NOT NULL,
+            nombre VARCHAR(100) NOT NULL,
+            correo VARCHAR(100) UNIQUE NOT NULL,
+            contrasena VARCHAR(100) NOT NULL,
+            rol VARCHAR(20) DEFAULT 'tecnico'
+        );
+    """)
+
+    # Crear tabla de mantenimientos si no existe
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS mantenimiento (
+            id SERIAL PRIMARY KEY,
+            sede VARCHAR(100),
+            fecha DATE,
+            area VARCHAR(100),
+            tecnico VARCHAR(100),
+            nombre_maquina VARCHAR(100),
+            usuario VARCHAR(100),
+            tipo_equipo VARCHAR(100),
+            marca VARCHAR(100),
+            modelo VARCHAR(100),
+            serial VARCHAR(100),
+            sistema_operativo VARCHAR(100),
+            office VARCHAR(100),
+            antivirus VARCHAR(100),
+            compresor VARCHAR(100),
+            control_remoto VARCHAR(100),
+            activo_fijo VARCHAR(100),
+            observaciones TEXT,
+            cerrado BOOLEAN DEFAULT FALSE,
+            ciclo_id INT REFERENCES ciclos(id) ON DELETE SET NULL,
+            empresa_id INT REFERENCES empresas(id) ON DELETE SET NULL
+        );
+    """)
+
+    # Tabla de recuperación de contraseñas
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id SERIAL PRIMARY KEY,
+            usuario VARCHAR(50) REFERENCES tecnicos(usuario) ON DELETE CASCADE,
+            token VARCHAR(255) UNIQUE NOT NULL,
+            expires_at TIMESTAMP NOT NULL
+        );
+    """)
 
     conn.commit()
     conn.close()
-    print("✅ Base de datos inicializada correctamente.")
+    print("✅ Base de datos inicializada correctamente (sin empresa base).")
 
 # Ejecutar init al iniciar la app
 with app.app_context():
