@@ -635,7 +635,7 @@ def principal():
                     (sede, fecha, area, tecnico, nombre_maquina, usuario, tipo_equipo, marca, modelo, serial,
                      sistema_operativo, office, antivirus, compresor, control_remoto, activo_fijo, observaciones, ciclo_id, empresa_id)
                      VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''', datos)
-        conn.commit()Bienvenido
+        conn.commit()
         flash('Registro guardado correctamente', 'success')
 
     # Determinar ciclo para consultas
