@@ -20,23 +20,6 @@
 
     <h3 class="mb-4">📅 Administración de Ciclos Trimestrales</h3>
 
-    <!-- Seleccionar empresa -->
-    <form method="GET" class="mb-4">
-        <div class="row align-items-end">
-            <div class="col-md-6">
-                <label class="form-label fw-bold">Empresa</label>
-                <select name="empresa_id" class="form-select" onchange="this.form.submit()">
-                    <option value="">-- Selecciona una empresa --</option>
-                    {% for e in empresas %}
-                        <option value="{{ e.id }}" {% if empresa_seleccionada == e.id %}selected{% endif %}>
-                            {{ e.nombre }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-        </div>
-    </form>
-
     {% if empresa_seleccionada %}
     <!-- Formulario para crear nuevo ciclo -->
     <form method="POST" class="mb-4">
