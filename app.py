@@ -869,6 +869,7 @@ def consultar():
                            sedes=sedes,
                            page=page,
                            empresa_nombre=session.get('empresa_nombre'),
+                           nombre=session.get('nombre'),
                            total_pages=total_pages)
 
 @app.route('/obtener_registro/<int:rid>')
