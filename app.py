@@ -972,39 +972,71 @@ def eliminar(rid):
     flash('Registro eliminado', 'info')
     return redirect(url_for('principal'))
 
-@app.route('/exportar')
+@app.route('/exportar', methods=['GET', 'POST'])
 @admin_required
 def exportar():
     conn = get_db_connection()
     c = conn.cursor()
-
-    # Si hay empresa en sesión, exportar solo esa empresa
     empresa_id_session = session.get('empresa_id')
-    if empresa_id_session:
-        c.execute("SELECT * FROM mantenimiento WHERE empresa_id=%s ORDER BY fecha DESC", (empresa_id_session,))
-    else:
-        c.execute("SELECT * FROM mantenimiento ORDER BY fecha DESC")
-    registros = c.fetchall()
-    conn.close()
+    empresa_nombre_session = session.get('empresa_nombre')
 
-    if not registros:
-        flash('No hay registros para exportar', 'warning')
+    # 🔹 Si no hay empresa en sesión, prevenir exportación
+    if not empresa_id_session:
+        conn.close()
+        flash('⚠️ No hay una empresa seleccionada en la sesión.', 'warning')
         return redirect(url_for('principal'))
 
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Mantenimiento"
-    encabezados = list(registros[0].keys())
-    ws.append(encabezados)
-    for row in registros:
-        ws.append(list(row.values()))
-    bio = BytesIO()
-    wb.save(bio)
-    bio.seek(0)
+    # 🔹 Obtener los ciclos de esa empresa
+    c.execute("SELECT id, nombre, anio, activo FROM ciclos WHERE empresa_id=%s ORDER BY id DESC", (empresa_id_session,))
+    ciclos = c.fetchall()
 
-    return send_file(bio, as_attachment=True,
-                     download_name='Mantenimiento.xlsx',
-                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    # 🔹 Si el formulario fue enviado
+    if request.method == 'POST':
+        ciclo_id = request.form.get('ciclo_id')
+
+        if not ciclo_id:
+            flash('⚠️ Debes seleccionar un ciclo para exportar.', 'warning')
+            conn.close()
+            return render_template('exportar.html', ciclos=ciclos, empresa_nombre=empresa_nombre_session)
+
+        # Obtener los registros del ciclo seleccionado
+        c.execute("""
+            SELECT * FROM mantenimiento 
+            WHERE ciclo_id=%s AND empresa_id=%s
+            ORDER BY fecha DESC
+        """, (ciclo_id, empresa_id_session))
+        registros = c.fetchall()
+
+        if not registros:
+            conn.close()
+            flash('No hay registros para exportar en este ciclo.', 'info')
+            return render_template('exportar.html', ciclos=ciclos, empresa_nombre=empresa_nombre_session)
+
+        # Crear Excel
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Mantenimiento"
+        encabezados = list(registros[0].keys())
+        ws.append(encabezados)
+        for row in registros:
+            ws.append(list(row.values()))
+        bio = BytesIO()
+        wb.save(bio)
+        bio.seek(0)
+        conn.close()
+
+        nombre_ciclo = next((c['nombre'] for c in ciclos if str(c['id']) == str(ciclo_id)), f"Ciclo_{ciclo_id}")
+        nombre_archivo = f"Mantenimientos_{empresa_nombre_session}_{nombre_ciclo}.xlsx".replace(" ", "_")
+
+        return send_file(
+            bio,
+            as_attachment=True,
+            download_name=nombre_archivo,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+
+    conn.close()
+    return render_template('exportar.html', ciclos=ciclos, empresa_nombre=empresa_nombre_session)
 
 @app.route('/acta/<int:rid>')
 @login_required

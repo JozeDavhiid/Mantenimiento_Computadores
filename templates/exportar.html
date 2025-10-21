@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Exportar Registros{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">📤 Exportar Registros de Mantenimiento</h5>
+      <span class="badge bg-light text-dark">Empresa: {{ empresa_nombre }}</span>
+    </div>
+
+    <div class="card-body">
+      <form method="POST" class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-bold">Selecciona el ciclo a exportar:</label>
+          <select name="ciclo_id" class="form-select" required>
+            <option value="">-- Selecciona un ciclo --</option>
+            {% for c in ciclos %}
+              <option value="{{ c.id }}">
+                {{ c.nombre }} ({{ c.anio }}) {% if c.activo %}- Activo{% else %}- Cerrado{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-12 mt-3">
+          <button type="submit" class="btn btn-success">
+            📦 Exportar a Excel
+          </button>
+          <a href="{{ url_for('principal') }}" class="btn btn-secondary">
+            ⬅️ Volver al Panel
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
