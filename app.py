@@ -472,11 +472,22 @@ def admin_ciclos():
             WHERE activo = TRUE AND empresa_id = %s
         """, (date.today(), empresa_seleccionada))
 
-        nombre = request.form.get('nombre', f"Ciclo {date.today().strftime('%b %Y')}")
-        trimestre = request.form.get('trimestre', 1)
-        anio = request.form.get('anio', date.today().year)
-        fecha_inicio = request.form.get('fecha_inicio', date.today())
-        observaciones = request.form.get('observaciones', '')
+        nombre = request.form.get('nombre', '').strip() or f"Ciclo {date.today().strftime('%b %Y')}"
+
+        # Trimestre y año convertidos de forma segura
+        try:
+            trimestre = int(request.form.get('trimestre', '') or 1)
+        except ValueError:
+            trimestre = 1
+
+        try:
+            anio = int(request.form.get('anio', '') or date.today().year)
+        except ValueError:
+            anio = date.today().year
+
+        # Fechas y observaciones
+        fecha_inicio = request.form.get('fecha_inicio') or date.today()
+        observaciones = request.form.get('observaciones', '').strip()
 
         c.execute("""
             INSERT INTO ciclos (nombre, trimestre, anio, fecha_inicio, observaciones, activo, empresa_id)
