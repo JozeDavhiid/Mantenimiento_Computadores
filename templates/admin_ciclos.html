@@ -100,6 +100,12 @@
                             <a href="{{ url_for('editar_ciclo', ciclo_id=c.id) }}" class="btn btn-sm btn-outline-primary">
                                 ✏️ Editar
                             </a>
+                            <form method="POST" action="{{ url_for('cerrar_ciclo', ciclo_id=c.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-danger" 
+                                        onclick="return confirm('¿Seguro que deseas cerrar este ciclo y sus mantenimientos asociados?')">
+                                    🔒 Cerrar
+                                </button>
+                            </form>
                             {% endif %}
                         </td>
                     </tr>

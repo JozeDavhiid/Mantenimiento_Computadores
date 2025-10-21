@@ -1246,6 +1246,45 @@ def editar_ciclo(ciclo_id):
         empresa_nombre=empresa_nombre_sesion
     )
 
+@app.route('/cerrar_ciclo/<int:ciclo_id>', methods=['POST'])
+@admin_required
+def cerrar_ciclo(ciclo_id):
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    # Verificar que el ciclo exista y esté activo
+    c.execute("SELECT id, nombre, empresa_id, activo FROM ciclos WHERE id=%s", (ciclo_id,))
+    ciclo = c.fetchone()
+
+    if not ciclo:
+        flash('❌ Ciclo no encontrado.', 'danger')
+        conn.close()
+        return redirect(url_for('admin_ciclos'))
+
+    if not ciclo['activo']:
+        flash('⚠️ Este ciclo ya está cerrado.', 'warning')
+        conn.close()
+        return redirect(url_for('admin_ciclos'))
+
+    # Cerrar el ciclo y los mantenimientos asociados
+    c.execute("""
+        UPDATE ciclos
+        SET activo = FALSE, fecha_cierre = %s
+        WHERE id = %s
+    """, (date.today(), ciclo_id))
+
+    c.execute("""
+        UPDATE mantenimiento
+        SET cerrado = TRUE
+        WHERE ciclo_id = %s
+    """, (ciclo_id,))
+
+    conn.commit()
+    conn.close()
+
+    flash(f"🔒 Ciclo '{ciclo['nombre']}' cerrado junto con sus mantenimientos asociados.", 'info')
+    return redirect(url_for('admin_ciclos', empresa_id=ciclo['empresa_id']))
+
 # -----------------------
 # Main
 # -----------------------
