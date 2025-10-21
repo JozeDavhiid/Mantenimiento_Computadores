@@ -1191,13 +1191,17 @@ def editar_ciclo(ciclo_id):
         observaciones = request.form.get('observaciones', '').strip()
         empresa_id = request.form.get('empresa_id')
 
-        # Validaciones mínimas
+        # ✅ Convertir fecha_cierre vacía a None (NULL en PostgreSQL)
+        if fecha_cierre == '':
+            fecha_cierre = None
+
+        # ✅ Validaciones mínimas
         if not trimestre or not anio or not fecha_inicio:
             flash('Por favor completa los campos obligatorios.', 'warning')
             conn.close()
             return render_template('editar_ciclo.html', ciclo=ciclo, empresas=empresas)
 
-        # Actualizar ciclo
+        # ✅ Actualizar ciclo
         c.execute("""
             UPDATE ciclos
             SET nombre=%s, trimestre=%s, anio=%s, fecha_inicio=%s, fecha_cierre=%s,
