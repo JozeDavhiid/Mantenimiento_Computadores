@@ -446,35 +446,24 @@ def admin_ciclos():
     conn = get_db_connection()
     c = conn.cursor()
 
-    # 🟢 Obtener empresa desde la sesión
-    empresa_id_session = session.get('empresa_id')
+    # 🔹 Obtener empresa desde sesión (ya seleccionada al iniciar sesión)
+    empresa_id_sesion = session.get('empresa_id')
+    empresa_nombre_sesion = session.get('empresa_nombre')
 
-    if not empresa_id_session:
-        flash('⚠️ No se detectó una empresa activa en la sesión. Inicia sesión nuevamente.', 'danger')
+    if not empresa_id_sesion:
+        flash("No se detectó empresa en la sesión. Inicia sesión nuevamente.", "warning")
         conn.close()
         return redirect(url_for('logout'))
-
-    # 🔹 Obtener nombre de la empresa actual (para mostrarlo en la vista)
-    c.execute("SELECT nombre FROM empresas WHERE id = %s", (empresa_id_session,))
-    empresa = c.fetchone()
-    empresa_nombre = empresa['nombre'] if empresa else "Empresa desconocida"
 
     hoy = date.today().isoformat()
 
     # ==============================
-    # Crear nuevo ciclo
+    # CREAR NUEVO CICLO
     # ==============================
     if request.method == 'POST' and request.form.get('action') == 'nuevo':
-        # Cerrar ciclo activo previo de esa empresa
-        c.execute("""
-            UPDATE ciclos 
-            SET activo = FALSE, fecha_cierre = %s 
-            WHERE activo = TRUE AND empresa_id = %s
-        """, (date.today(), empresa_id_session))
-
-        # Crear nuevo ciclo
         nombre = request.form.get('nombre', '').strip() or f"Ciclo {date.today().strftime('%b %Y')}"
-
+        
+        # Conversión segura de trimestre y año
         try:
             trimestre = int(request.form.get('trimestre', '') or 1)
         except ValueError:
@@ -485,31 +474,42 @@ def admin_ciclos():
         except ValueError:
             anio = date.today().year
 
+        # Fechas
         fecha_inicio = request.form.get('fecha_inicio') or date.today()
         observaciones = request.form.get('observaciones', '').strip()
 
+        # Cerrar ciclo activo previo de esta empresa (si existe)
+        c.execute("""
+            UPDATE ciclos 
+            SET activo = FALSE, fecha_cierre = %s 
+            WHERE activo = TRUE AND empresa_id = %s
+        """, (date.today(), empresa_id_sesion))
+
+        # Crear nuevo ciclo
         c.execute("""
             INSERT INTO ciclos (nombre, trimestre, anio, fecha_inicio, observaciones, activo, empresa_id)
             VALUES (%s, %s, %s, %s, %s, TRUE, %s)
-        """, (nombre, trimestre, anio, fecha_inicio, observaciones, empresa_id_session))
+        """, (nombre, trimestre, anio, fecha_inicio, observaciones, empresa_id_sesion))
 
         conn.commit()
         conn.close()
-        flash(f'✅ Nuevo ciclo creado correctamente para {empresa_nombre}.', 'success')
+        flash(f'✅ Nuevo ciclo creado correctamente para {empresa_nombre_sesion}.', 'success')
         return redirect(url_for('admin_ciclos'))
 
     # ==============================
-    # Cerrar ciclo activo
+    # CERRAR CICLO ACTIVO
     # ==============================
     if request.method == 'POST' and request.form.get('action') == 'cerrar':
+        # Buscar ciclo activo
         c.execute("""
             SELECT id FROM ciclos 
             WHERE activo = TRUE AND empresa_id = %s 
             ORDER BY id DESC LIMIT 1
-        """, (empresa_id_session,))
+        """, (empresa_id_sesion,))
         ciclo_activo = c.fetchone()
 
         if ciclo_activo:
+            # Cerrar el ciclo y los mantenimientos asociados
             c.execute("""
                 UPDATE ciclos 
                 SET activo = FALSE, fecha_cierre = %s 
@@ -521,12 +521,38 @@ def admin_ciclos():
                 WHERE ciclo_id = %s
             """, (ciclo_activo['id'],))
             conn.commit()
-            flash(f'🔒 Ciclo cerrado exitosamente para {empresa_nombre}.', 'info')
+            flash('🔒 Ciclo cerrado exitosamente junto con sus mantenimientos.', 'info')
         else:
-            flash(f'⚠️ No hay ciclo activo para cerrar en {empresa_nombre}.', 'warning')
+            flash('⚠️ No hay ciclo activo para cerrar.', 'warning')
 
         conn.close()
         return redirect(url_for('admin_ciclos'))
+
+    # ==============================
+    # MOSTRAR CICLOS DE LA EMPRESA EN SESIÓN
+    # ==============================
+    c.execute("""
+        SELECT * FROM ciclos 
+        WHERE empresa_id = %s 
+        ORDER BY id DESC
+    """, (empresa_id_sesion,))
+    ciclos = c.fetchall()
+
+    # Obtener nombre de la empresa (por si no está en sesión)
+    if not empresa_nombre_sesion:
+        c.execute("SELECT nombre FROM empresas WHERE id = %s", (empresa_id_sesion,))
+        row = c.fetchone()
+        empresa_nombre_sesion = row['nombre'] if row else "Desconocida"
+
+    conn.close()
+
+    return render_template(
+        'admin_ciclos.html',
+        empresa_seleccionada=empresa_id_sesion,
+        empresa_nombre=empresa_nombre_sesion,
+        ciclos=ciclos,
+        hoy=hoy
+    )
 
     # ==============================
     # Mostrar ciclos de la empresa activa
