@@ -904,62 +904,82 @@ def consultar():
 def obtener_registro(rid):
     conn = get_db_connection()
     c = conn.cursor()
+
+    # 🔹 Obtener el registro de mantenimiento
     c.execute("SELECT * FROM mantenimiento WHERE id=%s", (rid,))
     registro = c.fetchone()
 
-    # comprobar si registro pertenece a ciclo cerrado
-    if registro and registro.get('ciclo_id'):
+    if not registro:
+        conn.close()
+        flash('⚠️ Registro no encontrado.', 'warning')
+        return redirect(url_for('principal'))
+
+    # 🔹 Inicializar indicadores
+    registro['ciclo_activo'] = True
+    registro['cerrado'] = registro.get('cerrado', False)
+
+    # 🔹 Si el registro pertenece a un ciclo, verificar su estado
+    ciclo_activo = True
+    if registro.get('ciclo_id'):
         c.execute("SELECT activo FROM ciclos WHERE id=%s", (registro['ciclo_id'],))
         ciclo = c.fetchone()
-        if not ciclo or not ciclo['activo']:
+        ciclo_activo = ciclo and ciclo['activo']
+        registro['ciclo_activo'] = ciclo_activo
+
+        # Si el ciclo está cerrado, el registro se considera cerrado
+        if not ciclo_activo:
             registro['cerrado'] = True
-        else:
-            registro['cerrado'] = registro.get('cerrado', False)
 
     conn.close()
 
-    if not registro:
-        flash('Registro no encontrado', 'warning')
-        return redirect(url_for('principal'))
+    # 🔹 Obtener datos de sesión
+    nombre = session.get('nombre')
+    empresa_nombre = session.get('empresa_nombre')
 
-    return render_template('editar.html', registro=registro)
-
+    return render_template(
+        'editar.html',
+        registro=registro,
+        nombre=nombre,
+        empresa_nombre=empresa_nombre
+    )
 @app.route('/actualizar/<int:rid>', methods=['POST'])
 @login_required
 def actualizar_registro(rid):
     conn = get_db_connection()
     c = conn.cursor()
 
-    # Obtener info del registro
-    c.execute("SELECT ciclo_id, cerrado FROM mantenimiento WHERE id=%s", (rid,))
+    # Obtener info del registro con su ciclo
+    c.execute("""
+        SELECT m.id, m.ciclo_id, m.cerrado, c.activo AS ciclo_activo
+        FROM mantenimiento m
+        LEFT JOIN ciclos c ON m.ciclo_id = c.id
+        WHERE m.id = %s
+    """, (rid,))
     registro = c.fetchone()
 
     if not registro:
         conn.close()
-        flash('Registro no encontrado.', 'warning')
+        flash('⚠️ Registro no encontrado.', 'warning')
         return redirect(url_for('principal'))
 
-    ciclo_id = registro.get('ciclo_id')
-    cerrado = registro.get('cerrado')
-
-    # Si el registro está cerrado, ningún usuario puede editarlo
-    if cerrado:
+    # 🔒 Verificar condiciones
+    if registro['cerrado']:
         conn.close()
-        flash('❌ Este registro está cerrado y no puede modificarse.', 'danger')
+        flash('🚫 Este registro está cerrado y no puede modificarse.', 'danger')
         return redirect(url_for('principal'))
 
-    # Verificar el ciclo
-    if ciclo_id:
-        c.execute("SELECT activo FROM ciclos WHERE id=%s", (ciclo_id,))
-        ciclo = c.fetchone()
+    if not registro['ciclo_activo']:
+        conn.close()
+        flash('⚠️ El ciclo asociado está cerrado. No se pueden hacer cambios.', 'warning')
+        return redirect(url_for('principal'))
 
-        # Si no existe o está cerrado
-        if not ciclo or not ciclo['activo']:
-            conn.close()
-            flash('⚠️ El ciclo asociado está cerrado, no se pueden realizar cambios.', 'warning')
-            return redirect(url_for('principal'))
+    rol = session.get('rol')
+    if rol not in ['admin', 'tecnico']:
+        conn.close()
+        flash('🚫 No tienes permisos para editar este registro.', 'danger')
+        return redirect(url_for('principal'))
 
-    # --- ✅ Si llegamos aquí, el registro y el ciclo están abiertos ---
+    # 📝 Actualizar datos del formulario
     campos = [
         'sede', 'fecha', 'area', 'nombre_maquina', 'usuario_equipo', 'tipo_equipo',
         'marca', 'modelo', 'serial', 'so', 'office', 'antivirus',
@@ -967,7 +987,6 @@ def actualizar_registro(rid):
     ]
     valores = [request.form.get(campo, '') for campo in campos]
 
-    # Actualizar los datos
     c.execute("""
         UPDATE mantenimiento SET
             sede=%s, fecha=%s, area=%s, nombre_maquina=%s, usuario=%s, tipo_equipo=%s,
@@ -978,7 +997,6 @@ def actualizar_registro(rid):
 
     conn.commit()
     conn.close()
-
     flash('✅ Registro actualizado correctamente.', 'success')
     return redirect(url_for('principal'))
 
@@ -1245,7 +1263,7 @@ def editar_ciclo(ciclo_id):
         conn.close()
         return redirect(url_for('admin_ciclos'))
 
-    # Verificar si el ciclo está cerrado
+    # Si el ciclo está cerrado → no se puede editar
     if not ciclo['activo']:
         flash('🚫 No se puede editar un ciclo cerrado.', 'warning')
         conn.close()
@@ -1266,12 +1284,12 @@ def editar_ciclo(ciclo_id):
         conn.close()
         return redirect(url_for('admin_ciclos'))
 
-    # Obtener lista de empresas (solo para mostrar, no para seleccionar)
+    # Lista de empresas (solo para mostrar)
     c.execute("SELECT id, nombre FROM empresas ORDER BY nombre")
     empresas = c.fetchall()
 
     # ===========================
-    # POST: Guardar cambios
+    # POST → Guardar cambios
     # ===========================
     if request.method == 'POST':
         nombre = request.form.get('nombre', '').strip()
@@ -1284,7 +1302,7 @@ def editar_ciclo(ciclo_id):
         # 🔧 Corregir fechas vacías
         fecha_cierre = fecha_cierre if fecha_cierre else None
 
-        # Validaciones mínimas
+        # Validaciones
         if not trimestre or not anio or not fecha_inicio:
             flash('⚠️ Por favor completa los campos obligatorios.', 'warning')
             conn.close()
@@ -1295,13 +1313,14 @@ def editar_ciclo(ciclo_id):
                 empresa_nombre=empresa_nombre_sesion
             )
 
-        # ✅ Actualizar ciclo usando la empresa en sesión
+        # ✅ Actualizar ciclo
         c.execute("""
             UPDATE ciclos
             SET nombre=%s, trimestre=%s, anio=%s, fecha_inicio=%s, fecha_cierre=%s,
                 observaciones=%s, empresa_id=%s
             WHERE id=%s
-        """, (nombre, trimestre, anio, fecha_inicio, fecha_cierre, observaciones, empresa_id_sesion, ciclo_id))
+        """, (nombre, trimestre, anio, fecha_inicio, fecha_cierre,
+              observaciones, empresa_id_sesion, ciclo_id))
 
         conn.commit()
         conn.close()
@@ -1309,7 +1328,7 @@ def editar_ciclo(ciclo_id):
         return redirect(url_for('admin_ciclos'))
 
     # ===========================
-    # GET: Mostrar formulario
+    # GET → Mostrar formulario
     # ===========================
     conn.close()
     return render_template(
