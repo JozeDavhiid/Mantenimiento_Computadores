@@ -49,23 +49,27 @@
   <div class="card mx-auto col-lg-10 col-md-12 p-4">
     <h2 class="text-center mb-4 fw-bold">Editar Registro #{{ registro.id }}</h2>
 
-    <form action="{{ url_for('actualizar_registro', rid=registro.id) }}" method="post" class="row g-3">
-      {% set is_admin = session.get('rol') == 'admin' %}
-      {% set readonly = '' if is_admin else 'readonly' %}
+    {% set rol = session.get('rol') %}
+    {% set ciclo_abierto = registro.ciclo_activo %}
+    {% set registro_abierto = not registro.cerrado %}
+    {% set puede_editar = (rol in ['admin', 'tecnico']) and ciclo_abierto and registro_abierto %}
 
+    <form action="{{ url_for('actualizar_registro', rid=registro.id) }}" method="post" class="row g-3">
+
+      <!-- Campos principales -->
       <div class="col-md-6">
         <label class="form-label fw-bold">Sede</label>
-        <input type="text" name="sede" class="form-control" value="{{ registro.sede }}" {{ readonly }}>
+        <input type="text" name="sede" class="form-control" value="{{ registro.sede }}" {% if not puede_editar %}readonly{% endif %}>
       </div>
 
       <div class="col-md-6">
         <label class="form-label fw-bold">Fecha</label>
-        <input type="date" name="fecha" class="form-control" value="{{ registro.fecha }}" {{ readonly }}>
+        <input type="date" name="fecha" class="form-control" value="{{ registro.fecha }}" {% if not puede_editar %}readonly{% endif %}>
       </div>
 
       <div class="col-md-6">
         <label class="form-label fw-bold">Área</label>
-        <input type="text" name="area" class="form-control" value="{{ registro.area }}" {{ readonly }}>
+        <input type="text" name="area" class="form-control" value="{{ registro.area }}" {% if not puede_editar %}readonly{% endif %}>
       </div>
 
       <div class="col-md-6">
@@ -75,71 +79,71 @@
 
       <div class="col-md-6">
         <label class="form-label fw-bold">Nombre Máquina</label>
-        <input type="text" name="nombre_maquina" class="form-control text-uppercase" value="{{ registro.nombre_maquina }}" {{ readonly }}>
+        <input type="text" name="nombre_maquina" class="form-control text-uppercase" value="{{ registro.nombre_maquina }}" {% if not puede_editar %}readonly{% endif %}>
       </div>
 
       <div class="col-md-6">
         <label class="form-label fw-bold">Usuario del Equipo</label>
-        <input type="text" name="usuario_equipo" class="form-control" value="{{ registro.usuario }}" {{ readonly }}>
+        <input type="text" name="usuario_equipo" class="form-control" value="{{ registro.usuario }}" {% if not puede_editar %}readonly{% endif %}>
       </div>
 
       <div class="col-md-6">
         <label class="form-label fw-bold">Tipo de Equipo</label>
-        <input type="text" name="tipo_equipo" class="form-control" value="{{ registro.tipo_equipo }}" {{ readonly }}>
+        <input type="text" name="tipo_equipo" class="form-control" value="{{ registro.tipo_equipo }}" {% if not puede_editar %}readonly{% endif %}>
       </div>
 
       <div class="col-md-6">
         <label class="form-label fw-bold">Marca</label>
-        <input type="text" name="marca" class="form-control text-uppercase" value="{{ registro.marca }}" {{ readonly }}>
+        <input type="text" name="marca" class="form-control text-uppercase" value="{{ registro.marca }}" {% if not puede_editar %}readonly{% endif %}>
       </div>
 
       <div class="col-md-6">
         <label class="form-label fw-bold">Modelo</label>
-        <input type="text" name="modelo" class="form-control text-uppercase" value="{{ registro.modelo }}" {{ readonly }}>
+        <input type="text" name="modelo" class="form-control text-uppercase" value="{{ registro.modelo }}" {% if not puede_editar %}readonly{% endif %}>
       </div>
 
       <div class="col-md-6">
         <label class="form-label fw-bold">Serial</label>
-        <input type="text" name="serial" class="form-control text-uppercase" value="{{ registro.serial }}" {{ readonly }}>
+        <input type="text" name="serial" class="form-control text-uppercase" value="{{ registro.serial }}" {% if not puede_editar %}readonly{% endif %}>
       </div>
 
       <div class="col-md-6">
         <label class="form-label fw-bold">Sistema Operativo</label>
-        <input type="text" name="so" class="form-control" value="{{ registro.sistema_operativo }}" {{ readonly }}>
+        <input type="text" name="so" class="form-control" value="{{ registro.sistema_operativo }}" {% if not puede_editar %}readonly{% endif %}>
       </div>
 
       <div class="col-md-6">
         <label class="form-label fw-bold">Office</label>
-        <input type="text" name="office" class="form-control" value="{{ registro.office }}" {{ readonly }}>
+        <input type="text" name="office" class="form-control" value="{{ registro.office }}" {% if not puede_editar %}readonly{% endif %}>
       </div>
 
       <div class="col-md-6">
         <label class="form-label fw-bold">Antivirus</label>
-        <input type="text" name="antivirus" class="form-control" value="{{ registro.antivirus }}" {{ readonly }}>
+        <input type="text" name="antivirus" class="form-control" value="{{ registro.antivirus }}" {% if not puede_editar %}readonly{% endif %}>
       </div>
 
       <div class="col-md-6">
         <label class="form-label fw-bold">Compresor</label>
-        <input type="text" name="compresor" class="form-control" value="{{ registro.compresor }}" {{ readonly }}>
+        <input type="text" name="compresor" class="form-control" value="{{ registro.compresor }}" {% if not puede_editar %}readonly{% endif %}>
       </div>
 
       <div class="col-md-6">
         <label class="form-label fw-bold">Control Remoto</label>
-        <input type="text" name="control_remoto" class="form-control" value="{{ registro.control_remoto }}" {{ readonly }}>
+        <input type="text" name="control_remoto" class="form-control" value="{{ registro.control_remoto }}" {% if not puede_editar %}readonly{% endif %}>
       </div>
 
       <div class="col-md-6">
         <label class="form-label fw-bold">Activo Fijo</label>
-        <input type="text" name="activo_fijo" class="form-control" value="{{ registro.activo_fijo }}" {{ readonly }}>
+        <input type="text" name="activo_fijo" class="form-control" value="{{ registro.activo_fijo }}" {% if not puede_editar %}readonly{% endif %}>
       </div>
 
       <div class="col-12">
         <label class="form-label fw-bold">Observaciones</label>
-        <textarea name="observaciones" rows="4" class="form-control" {{ readonly }}>{{ registro.observaciones }}</textarea>
+        <textarea name="observaciones" rows="4" class="form-control" {% if not puede_editar %}readonly{% endif %}>{{ registro.observaciones }}</textarea>
       </div>
 
       <div class="col-12 text-center mt-4">
-        {% if is_admin %}
+        {% if puede_editar %}
           <button type="submit" class="btn btn-success btn-custom me-3 shadow-sm">💾 Guardar Cambios</button>
         {% else %}
           <button type="button" class="btn btn-secondary btn-custom me-3 shadow-sm" disabled>Solo lectura</button>
