@@ -929,26 +929,37 @@ def obtener_registro(rid):
 def actualizar_registro(rid):
     conn = get_db_connection()
     c = conn.cursor()
+
+    # Obtener info del registro
     c.execute("SELECT ciclo_id, cerrado FROM mantenimiento WHERE id=%s", (rid,))
-    row = c.fetchone()
-    if not row:
+    registro = c.fetchone()
+
+    if not registro:
         conn.close()
-        flash('Registro no encontrado', 'warning')
+        flash('Registro no encontrado.', 'warning')
         return redirect(url_for('principal'))
 
-    ciclo_id = row.get('ciclo_id')
-    if row.get('cerrado'):
+    ciclo_id = registro.get('ciclo_id')
+    cerrado = registro.get('cerrado')
+
+    # Si el registro está cerrado, ningún usuario puede editarlo
+    if cerrado:
         conn.close()
-        flash('Este registro pertenece a un ciclo cerrado y no se puede modificar.', 'warning')
+        flash('❌ Este registro está cerrado y no puede modificarse.', 'danger')
         return redirect(url_for('principal'))
+
+    # Verificar el ciclo
     if ciclo_id:
         c.execute("SELECT activo FROM ciclos WHERE id=%s", (ciclo_id,))
         ciclo = c.fetchone()
+
+        # Si no existe o está cerrado
         if not ciclo or not ciclo['activo']:
             conn.close()
-            flash('Este registro pertenece a un ciclo cerrado y no se puede modificar.', 'warning')
+            flash('⚠️ El ciclo asociado está cerrado, no se pueden realizar cambios.', 'warning')
             return redirect(url_for('principal'))
 
+    # --- ✅ Si llegamos aquí, el registro y el ciclo están abiertos ---
     campos = [
         'sede', 'fecha', 'area', 'nombre_maquina', 'usuario_equipo', 'tipo_equipo',
         'marca', 'modelo', 'serial', 'so', 'office', 'antivirus',
@@ -956,15 +967,19 @@ def actualizar_registro(rid):
     ]
     valores = [request.form.get(campo, '') for campo in campos]
 
-    c.execute('''UPDATE mantenimiento SET
-                 sede=%s, fecha=%s, area=%s, nombre_maquina=%s, usuario=%s, tipo_equipo=%s, 
-                 marca=%s, modelo=%s, serial=%s, sistema_operativo=%s, office=%s, antivirus=%s,
-                 compresor=%s, control_remoto=%s, activo_fijo=%s, observaciones=%s
-                 WHERE id=%s''', (*valores, rid))
+    # Actualizar los datos
+    c.execute("""
+        UPDATE mantenimiento SET
+            sede=%s, fecha=%s, area=%s, nombre_maquina=%s, usuario=%s, tipo_equipo=%s,
+            marca=%s, modelo=%s, serial=%s, sistema_operativo=%s, office=%s, antivirus=%s,
+            compresor=%s, control_remoto=%s, activo_fijo=%s, observaciones=%s
+        WHERE id=%s
+    """, (*valores, rid))
+
     conn.commit()
     conn.close()
 
-    flash('✅ Registro actualizado correctamente', 'success')
+    flash('✅ Registro actualizado correctamente.', 'success')
     return redirect(url_for('principal'))
 
 @app.route('/eliminar/<int:rid>', methods=['POST'])
