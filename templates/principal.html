@@ -49,18 +49,6 @@
     {% endif %}
   {% endwith %}
 
-  <!-- ✅ MENÚ RÁPIDO -->
-  <div class="d-flex flex-wrap gap-2 mb-3">
-    <a href="{{ url_for('equipos') }}" class="btn btn-outline-dark">📦 Inventario de Equipos</a>
-    <a href="{{ url_for('equipo_nuevo') }}" class="btn btn-outline-success">➕ Registrar Equipo</a>
-    <a href="{{ url_for('exportar_inventario') }}" class="btn btn-outline-primary">📤 Exportar Inventario</a>
-
-    {% if rol == 'admin' %}
-    <a href="{{ url_for('registro') }}" class="btn btn-secondary">Registrar Técnico</a>
-    <a href="{{ url_for('admin_ciclos') }}" class="btn btn-dark">⚙️ Ciclos</a>
-    {% endif %}
-  </div>
-
   <!-- ✅ FORMULARIO REGISTRO -->
   <div class="card shadow mb-4">
     <div class="card-header bg-primary text-white fw-bold">Registrar Nuevo Mantenimiento</div>
@@ -213,6 +201,9 @@
 
           <a href="{{ url_for('consultar') }}" class="btn btn-info">Consultar Registros</a>
           <a href="{{ url_for('equipos') }}" class="btn btn-outline-dark">📦 Inventario</a>
+          <a href="{{ url_for('equipos') }}" class="btn btn-outline-dark">📦 Inventario de Equipos</a>
+          <a href="{{ url_for('equipo_nuevo') }}" class="btn btn-outline-success">➕ Registrar Equipo</a>
+          <a href="{{ url_for('exportar_inventario') }}" class="btn btn-outline-primary">📤 Exportar Inventario</a>
 
           {% if rol == 'admin' %}
             <a href="{{ url_for('registro') }}" class="btn btn-secondary">Registrar Técnico</a>
