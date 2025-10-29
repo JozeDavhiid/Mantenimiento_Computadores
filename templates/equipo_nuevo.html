@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Nuevo Equipo{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+    <div class="card shadow-sm p-4 col-lg-8 mx-auto">
+        <h3 class="fw-bold text-center mb-3">➕ Registrar Nuevo Equipo</h3>
+
+        <form method="POST" class="row g-3">
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Nombre del Equipo</label>
+                <input type="text" name="nombre_maquina" class="form-control" required>
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Usuario</label>
+                <input type="text" name="usuario_equipo" class="form-control">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Sede</label>
+                <input type="text" name="sede" class="form-control">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Tipo de Equipo</label>
+                <select name="tipo_equipo" class="form-select">
+                    <option>CPU</option>
+                    <option>Portátil</option>
+                    <option>Impresora</option>
+                    <option>Todo en Uno</option>
+                    <option>Otro</option>
+                </select>
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Marca</label>
+                <input type="text" name="marca" class="form-control text-uppercase">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Modelo</label>
+                <input type="text" name="modelo" class="form-control text-uppercase">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Serial</label>
+                <input type="text" name="serial" class="form-control text-uppercase">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Activo Fijo</label>
+                <input type="text" name="activo_fijo" class="form-control">
+            </div>
+
+            <div class="col-12 text-center mt-4">
+                <button class="btn btn-success btn-lg">💾 Guardar</button>
+                <a href="{{ url_for('equipos') }}" class="btn btn-secondary btn-lg">⬅️ Cancelar</a>
+            </div>
+
+        </form>
+    </div>
+
+</div>
+{% endblock %}

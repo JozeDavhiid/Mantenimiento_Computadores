@@ -314,6 +314,368 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
+@app.route('/equipos')
+@login_required
+def equipos():
+    empresa_id = session.get('empresa_id')
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM equipos WHERE empresa_id = %s ORDER BY sede, nombre_maquina", (empresa_id,))
+    equipos = c.fetchall()
+    conn.close()
+
+    return render_template('equipos.html', equipos=equipos)
+
+@app.route('/equipo_nuevo', methods=['GET', 'POST'])
+@login_required
+def equipo_nuevo():
+    empresa_id = session.get('empresa_id')
+    if request.method == 'POST':
+        datos = (
+            request.form['nombre_maquina'],
+            request.form['usuario_equipo'],
+            request.form['sede'],
+            request.form['marca'],
+            request.form['modelo'],
+            request.form['serial'],
+            request.form['activo_fijo'],
+            request.form['tipo_equipo'],
+            empresa_id
+        )
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO equipos (nombre_maquina, usuario_equipo, sede, marca, modelo, serial, activo_fijo, tipo_equipo, empresa_id)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """, datos)
+        conn.commit()
+        conn.close()
+        flash('✅ Equipo registrado correctamente', 'success')
+        return redirect(url_for('equipos'))
+    
+    return render_template('equipo_nuevo.html')
+
+@app.route('/equipo_editar/<int:id>', methods=['GET','POST'])
+@login_required
+def equipo_editar(id):
+    empresa_id = session.get('empresa_id')
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    c.execute("SELECT * FROM equipos WHERE id=%s AND empresa_id=%s", (id, empresa_id))
+    equipo = c.fetchone()
+
+    if not equipo:
+        flash('⚠️ Equipo no encontrado', 'warning')
+        return redirect(url_for('equipos'))
+
+    if request.method == 'POST':
+        campos = [
+            'nombre_maquina','usuario_equipo','sede','marca','modelo','serial',
+            'activo_fijo','tipo_equipo','estado'
+        ]
+        valores = [request.form.get(campo,'') for campo in campos]
+        valores.append(id)
+
+        c.execute("""
+            UPDATE equipos SET
+                nombre_maquina=%s, usuario_equipo=%s, sede=%s, marca=%s,
+                modelo=%s, serial=%s, activo_fijo=%s, tipo_equipo=%s, estado=%s
+            WHERE id=%s
+        """, valores)
+
+        conn.commit()
+        conn.close()
+        flash('✅ Equipo actualizado correctamente', 'success')
+        return redirect(url_for('equipos'))
+
+    conn.close()
+    return render_template('equipo_editar.html', equipo=equipo)
+
+@app.route('/historial/<int:equipo_id>')
+@login_required
+def ver_historial(equipo_id):
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    empresa_id = session.get('empresa_id')
+
+    # ✅ Obtener equipo solo si pertenece a la empresa actual
+    c.execute("""
+        SELECT *
+        FROM mantenimiento
+        WHERE id=%s AND empresa_id=%s
+    """, (equipo_id, empresa_id))
+    equipo = c.fetchone()
+
+    if not equipo:
+        flash("⚠️ Este equipo no pertenece a tu empresa o no existe.", "danger")
+        conn.close()
+        return redirect(url_for('equipos'))
+
+    # ✅ Obtener historial de mantenimientos
+    c.execute("""
+        SELECT id, fecha, observaciones, tecnico, ciclo_id, cerrado
+        FROM mantenimiento
+        WHERE nombre_maquina=%s AND empresa_id=%s
+        ORDER BY fecha DESC
+    """, (equipo['nombre_maquina'], empresa_id))
+
+    historial = c.fetchall()
+    conn.close()
+
+    return render_template("historial_equipo.html", equipo=equipo, historial=historial)
+
+@app.route('/exportar_historial_equipo/<int:equipo_id>')
+@login_required
+def exportar_historial_equipo(equipo_id):
+    import pandas as pd
+    from io import BytesIO
+    from flask import send_file
+
+    empresa_id = session.get('empresa_id')
+
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    # Obtener equipo
+    c.execute("""
+        SELECT nombre_maquina 
+        FROM mantenimiento
+        WHERE id=%s AND empresa_id=%s
+    """, (equipo_id, empresa_id))
+    equipo = c.fetchone()
+
+    if not equipo:
+        flash("⚠️ Equipo no encontrado o no pertenece a tu empresa.", "danger")
+        conn.close()
+        return redirect(url_for('equipos'))
+
+    nombre_maquina = equipo['nombre_maquina']
+
+    # Obtener historial
+    df = pd.read_sql_query("""
+        SELECT fecha, tecnico, ciclo_id, cerrado, observaciones
+        FROM mantenimiento
+        WHERE nombre_maquina=%s AND empresa_id=%s
+        ORDER BY fecha DESC
+    """, conn, params=(nombre_maquina, empresa_id))
+
+    conn.close()
+
+    # Crear archivo Excel
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name="Historial")
+
+    output.seek(0)
+
+    return send_file(
+        output,
+        download_name=f"Historial_{nombre_maquina}.xlsx",
+        as_attachment=True
+    )
+
+@app.route('/mover_equipo/<int:equipo_id>', methods=['GET', 'POST'])
+@login_required
+def mover_equipo(equipo_id):
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    empresa_id = session.get('empresa_id')
+
+    # Obtener equipo
+    c.execute("""
+        SELECT * FROM mantenimiento
+        WHERE id=%s AND empresa_id=%s
+    """, (equipo_id, empresa_id))
+    equipo = c.fetchone()
+
+    if not equipo:
+        flash("❌ Equipo no encontrado para esta empresa.", "danger")
+        conn.close()
+        return redirect(url_for('equipos'))
+
+    # Obtener lista de sedes
+    c.execute("""
+        SELECT DISTINCT sede
+        FROM mantenimiento
+        WHERE empresa_id=%s
+        ORDER BY sede
+    """, (empresa_id,))
+    sedes = [s['sede'] for s in c.fetchall()]
+
+    if request.method == "POST":
+        nueva_sede = request.form.get("nueva_sede", "").strip()
+
+        if not nueva_sede:
+            flash("⚠️ Debes seleccionar una sede.", "warning")
+        else:
+            c.execute("""
+                UPDATE mantenimiento
+                SET sede=%s
+                WHERE id=%s
+            """, (nueva_sede, equipo_id))
+
+            conn.commit()
+            flash("✅ Equipo movido correctamente.", "success")
+            conn.close()
+            return redirect(url_for('equipos'))
+
+    conn.close()
+    return render_template('mover_equipo.html', equipo=equipo, sedes=sedes)
+
+@app.route('/mantenimiento_equipo/<int:equipo_id>', methods=['GET', 'POST'])
+@login_required
+def nuevo_mantenimiento_desde_equipo(equipo_id):
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    empresa_id = session.get('empresa_id')
+
+    c.execute("""
+        SELECT * FROM mantenimiento
+        WHERE id=%s AND empresa_id=%s
+    """, (equipo_id, empresa_id))
+    equipo = c.fetchone()
+
+    if not equipo:
+        flash("Equipo no encontrado", "danger")
+        conn.close()
+        return redirect(url_for('equipos'))
+
+    if request.method == 'POST':
+        sede = equipo['sede']
+        nombre = equipo['nombre_maquina']
+        usuario = equipo['usuario_equipo']
+        tecnico = session.get('nombre')
+        fecha = date.today()
+
+        c.execute("""
+            INSERT INTO mantenimiento (sede, fecha, nombre_maquina, usuario, tecnico, empresa_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (sede, fecha, nombre, usuario, tecnico, empresa_id))
+
+        conn.commit()
+        conn.close()
+        flash("✅ Mantenimiento creado desde inventario", "success")
+        return redirect(url_for('equipos'))
+
+    conn.close()
+    return render_template("nuevo_mantenimiento_desde_equipo.html", equipo=equipo)
+
+@app.route('/exportar_inventario')
+@login_required
+def exportar_inventario():
+    import pandas as pd
+    from io import BytesIO
+    from flask import send_file
+
+    empresa_id = session.get('empresa_id')
+
+    conn = get_db_connection()
+
+    df = pd.read_sql_query("""
+        SELECT sede, nombre_maquina, usuario, tipo_equipo, marca, modelo, serial, sistema_operativo,
+               office, antivirus, fecha, tecnico
+        FROM mantenimiento
+        WHERE empresa_id=%s
+        ORDER BY sede, nombre_maquina
+    """, conn, params=(empresa_id,))
+
+    conn.close()
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name="Inventario")
+
+    output.seek(0)
+
+    return send_file(
+        output,
+        download_name="Inventario_Computadores.xlsx",
+        as_attachment=True
+    )
+
+@app.route('/tareas/<int:equipo_id>', methods=['GET', 'POST'])
+@login_required
+def tareas_equipo(equipo_id):
+    conn = get_db_connection()
+    c = conn.cursor()
+    empresa_id = session.get('empresa_id')
+
+    # Validar equipo existe
+    c.execute("""
+        SELECT * FROM mantenimiento 
+        WHERE id=%s AND empresa_id=%s
+    """, (equipo_id, empresa_id))
+    equipo = c.fetchone()
+
+    if not equipo:
+        flash("Equipo no encontrado.", "danger")
+        conn.close()
+        return redirect(url_for('equipos'))
+
+    # Si agregan nueva tarea
+    if request.method == "POST":
+        descripcion = request.form.get('descripcion', '').strip()
+        if descripcion:
+            c.execute("""
+                INSERT INTO tareas (equipo_id, descripcion, empresa_id)
+                VALUES (%s, %s, %s)
+            """, (equipo_id, descripcion, empresa_id))
+            conn.commit()
+            flash("✅ Tarea agregada.", "success")
+
+    # Obtener tareas existentes
+    c.execute("""
+        SELECT * FROM tareas WHERE equipo_id=%s AND empresa_id=%s ORDER BY id DESC
+    """, (equipo_id, empresa_id))
+    tareas = c.fetchall()
+
+    conn.close()
+    return render_template("tareas_equipo.html", equipo=equipo, tareas=tareas)
+
+@app.route('/completar_tarea/<int:tarea_id>')
+@login_required
+def completar_tarea(tarea_id):
+    conn = get_db_connection()
+    c = conn.cursor()
+    empresa_id = session.get('empresa_id')
+
+    c.execute("""
+        UPDATE tareas SET completada=TRUE
+        WHERE id=%s AND empresa_id=%s
+    """, (tarea_id, empresa_id))
+
+    conn.commit()
+    conn.close()
+
+    flash("✅ Tarea marcada como completada", "success")
+    return redirect(request.referrer or url_for('equipos'))
+
+@app.route('/datos_dashboard')
+@login_required
+def datos_dashboard():
+    conn = get_db_connection()
+    c = conn.cursor()
+    empresa_id = session.get('empresa_id')
+
+    c.execute("""
+        SELECT TO_CHAR(fecha, 'Mon') AS mes, COUNT(*)
+        FROM mantenimiento
+        WHERE empresa_id=%s
+        GROUP BY mes ORDER BY mes
+    """, (empresa_id,))
+
+    datos = c.fetchall()
+    conn.close()
+
+    return jsonify({
+        "meses": [d['mes'] for d in datos],
+        "cantidades": [d['count'] for d in datos]
+    })
+
 # -----------------------
 # Recuperación por correo (SendGrid)
 # -----------------------

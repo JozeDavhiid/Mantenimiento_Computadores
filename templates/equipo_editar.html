@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Editar Equipo{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+    <div class="card shadow-sm p-4 col-lg-8 mx-auto">
+        <h3 class="fw-bold text-center mb-3">✏️ Editar Equipo</h3>
+
+        <form method="POST" class="row g-3">
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Nombre del Equipo</label>
+                <input type="text" name="nombre_maquina" class="form-control"
+                       value="{{ equipo.nombre_maquina }}">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Usuario</label>
+                <input type="text" name="usuario_equipo" class="form-control"
+                       value="{{ equipo.usuario_equipo }}">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Sede</label>
+                <input type="text" name="sede" class="form-control"
+                       value="{{ equipo.sede }}">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Tipo de Equipo</label>
+                <input type="text" name="tipo_equipo" class="form-control"
+                       value="{{ equipo.tipo_equipo }}">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Marca</label>
+                <input type="text" name="marca" class="form-control text-uppercase"
+                       value="{{ equipo.marca }}">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Modelo</label>
+                <input type="text" name="modelo" class="form-control text-uppercase"
+                       value="{{ equipo.modelo }}">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Serial</label>
+                <input type="text" name="serial" class="form-control text-uppercase"
+                       value="{{ equipo.serial }}">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Activo Fijo</label>
+                <input type="text" name="activo_fijo" class="form-control"
+                       value="{{ equipo.activo_fijo }}">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Estado</label>
+                <select name="estado" class="form-select">
+                    <option {% if equipo.estado == 'Operativo' %}selected{% endif %}>Operativo</option>
+                    <option {% if equipo.estado == 'En mantenimiento' %}selected{% endif %}>En mantenimiento</option>
+                    <option {% if equipo.estado == 'Fuera de servicio' %}selected{% endif %}>Fuera de servicio</option>
+                </select>
+            </div>
+
+            <div class="col-12 text-center mt-4">
+                <button class="btn btn-success btn-lg">💾 Guardar Cambios</button>
+                <a href="{{ url_for('equipos') }}" class="btn btn-secondary btn-lg">⬅️ Volver</a>
+            </div>
+
+        </form>
+    </div>
+
+</div>
+{% endblock %}

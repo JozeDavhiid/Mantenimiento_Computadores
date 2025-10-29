@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Mover equipo{% endblock %}
+{% block content %}
+
+<div class="container mt-4">
+    <div class="card p-3 shadow-sm">
+        <h3 class="fw-bold">🔁 Mover Equipo: {{ equipo.nombre_maquina }}</h3>
+
+        <form method="POST" class="mt-3">
+            <label class="form-label fw-bold">Seleccionar nueva sede</label>
+            <select name="nueva_sede" class="form-select">
+                <option value="">Seleccione...</option>
+                {% for s in sedes %}
+                <option value="{{ s }}">{{ s }}</option>
+                {% endfor %}
+            </select>
+
+            <button class="btn btn-success mt-3" type="submit">
+                ✅ Confirmar movimiento
+            </button>
+            <a href="{{ url_for('equipos') }}" class="btn btn-dark mt-3">⬅ Volver</a>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

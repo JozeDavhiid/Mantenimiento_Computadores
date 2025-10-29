@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Historial del Equipo{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+    <div class="card shadow-sm p-3">
+        <h3 class="fw-bold">📄 Historial de Mantenimientos</h3>
+        <p class="mb-0"><strong>Equipo:</strong> {{ equipo.nombre_maquina }}</p>
+        <p><strong>Usuario:</strong> {{ equipo.usuario_equipo }}</p>
+
+        <div class="d-flex justify-content-end mt-2">
+            <a href="{{ url_for('equipos') }}" class="btn btn-dark">⬅️ Volver</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mt-3">
+        <div class="card-body table-responsive">
+
+            {% if historial %}
+            <table class="table table-hover text-center">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Fecha</th>
+                        <th>Técnico</th>
+                        <th>Ciclo</th>
+                        <th>Estado</th>
+                        <th>Observaciones</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for h in historial %}
+                    <tr>
+                        <td>{{ h.id }}</td>
+                        <td>{{ h.fecha }}</td>
+                        <td>{{ h.tecnico }}</td>
+                        <td>{{ h.ciclo_id }}</td>
+                        <td>
+                            {% if h.cerrado %}
+                                <span class="badge bg-secondary">Cerrado</span>
+                            {% else %}
+                                <span class="badge bg-success">Abierto</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ h.observaciones }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+            </table>
+
+            {% else %}
+                <p class="text-center text-muted mt-3">
+                    No hay mantenimientos registrados para este equipo.
+                </p>
+            {% endif %}
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}

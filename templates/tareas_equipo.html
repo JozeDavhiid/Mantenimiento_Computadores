@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Tareas Pendientes{% endblock %}
+{% block content %}
+
+<div class="container mt-4">
+    <h3 class="fw-bold">✅ Tareas de {{ equipo.nombre_maquina }}</h3>
+
+    <form method="POST" class="my-3">
+        <div class="input-group">
+            <input type="text" name="descripcion" class="form-control" placeholder="Nueva tarea pendiente...">
+            <button class="btn btn-primary">➕ Agregar</button>
+        </div>
+    </form>
+
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Tarea</th>
+                <th>Fecha</th>
+                <th>Estado</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for t in tareas %}
+            <tr>
+                <td>{{ t.descripcion }}</td>
+                <td>{{ t.fecha_creacion }}</td>
+                <td>
+                    {% if t.completada %}
+                        ✅ Completada
+                    {% else %}
+                        ⌛ Pendiente
+                    {% endif %}
+                </td>
+                <td>
+                    {% if not t.completada %}
+                    <a href="{{ url_for('completar_tarea', tarea_id=t.id) }}" class="btn btn-success btn-sm">
+                        ✔ Marcar Completada
+                    </a>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <a href="{{ url_for('equipos') }}" class="btn btn-dark">⬅ Volver</a>
+</div>
+
+{% endblock %}
