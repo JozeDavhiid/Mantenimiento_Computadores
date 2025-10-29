@@ -590,9 +590,10 @@ def exportar_inventario():
     conn = get_db_connection()
     c = conn.cursor()
 
+    # ✅ Exportar inventario usando la tabla mantenimiento
     c.execute("""
-        SELECT id, nombre_maquina, usuario_equipo, sede, serial, tipo_equipo, estado
-        FROM inventario
+        SELECT id, nombre_maquina, usuario AS usuario_equipo, sede, serial, tipo_equipo
+        FROM mantenimiento
         WHERE empresa_id = %s
         ORDER BY id ASC
     """, (empresa_id,))
@@ -608,7 +609,6 @@ def exportar_inventario():
     headers = ["ID", "Nombre", "Usuario", "Sede", "Serial", "Tipo", "Estado"]
     ws.append(headers)
 
-    # Dar estilo a encabezados
     for col in ws[1]:
         col.font = Font(bold=True)
         col.alignment = Alignment(horizontal="center")
@@ -622,10 +622,9 @@ def exportar_inventario():
             e["sede"],
             e["serial"],
             e["tipo_equipo"],
-            e["estado"]
+            "Operativo"  # Por defecto
         ])
 
-    # Guardar en memoria
     output = BytesIO()
     wb.save(output)
     output.seek(0)
