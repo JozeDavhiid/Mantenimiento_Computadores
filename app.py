@@ -318,35 +318,27 @@ def logout():
 @app.route('/equipos')
 @login_required
 def equipos():
-    empresa_id = session.get('empresa_id')
-    buscar = request.args.get('buscar', '')
+    empresa_id = session.get("empresa_id")
+    empresa_nombre = session.get("empresa_nombre")
+
+    if not empresa_id:
+        flash("⚠ No hay empresa activa en sesión.", "warning")
+        return redirect(url_for('principal'))
 
     conn = get_db_connection()
     c = conn.cursor()
 
-    query = """
-        SELECT * FROM equipos
-        WHERE empresa_id=%s
-    """
-    params = [empresa_id]
-
-    if buscar:
-        query += """
-            AND (
-                serial ILIKE %s OR
-                usuario_equipo ILIKE %s OR
-                sede ILIKE %s OR
-                nombre_maquina ILIKE %s
-            )
-        """
-        search = f"%{buscar}%"
-        params += [search, search, search, search]
-
-    c.execute(query, tuple(params))
+    c.execute("""
+        SELECT id, nombre_maquina, usuario_equipo, sede, serial, tipo_equipo, estado
+        FROM inventario
+        WHERE empresa_id = %s
+        ORDER BY id ASC
+    """, (empresa_id,))
     equipos = c.fetchall()
+
     conn.close()
 
-    return render_template("equipos.html", equipos=equipos)
+    return render_template("equipos.html", equipos=equipos, empresa_nombre=empresa_nombre)
 
 
 @app.route('/equipo_nuevo', methods=['GET', 'POST'])

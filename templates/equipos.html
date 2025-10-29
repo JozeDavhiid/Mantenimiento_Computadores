@@ -4,32 +4,27 @@
 {% block content %}
 <div class="container mt-4">
 
-    <!-- TÍTULO + BOTONES -->
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
         <h3 class="fw-bold">📦 Inventario de Equipos</h3>
 
         <div class="d-flex gap-2">
-            <a href="{{ url_for('exportar_inventario') }}" class="btn btn-success">
+            <a href="{{ url_for('equipo_nuevo') }}" class="btn btn-success">➕ Agregar Equipo</a>
+            <a href="{{ url_for('exportar_inventario') }}" class="btn btn-outline-dark">
                 📥 Exportar Inventario
-            </a>
-
-            <a href="{{ url_for('equipo_nuevo') }}" class="btn btn-primary">
-                ➕ Agregar Equipo
             </a>
         </div>
     </div>
 
-    <!-- BUSCADOR -->
+    <!-- Buscador -->
     <form method="GET" class="mb-3">
         <input type="text" name="buscar" class="form-control"
-               placeholder="🔍 Buscar por serial, usuario, sede o nombre..."
-               value="{{ request.args.get('buscar','') }}">
+               placeholder="Buscar por serial, usuario, sede o nombre...">
     </form>
 
-    <!-- TABLA DE EQUIPOS -->
     <div class="card shadow-sm">
         <div class="card-body table-responsive">
-            <table class="table table-hover align-middle text-center">
+
+            <table class="table table-hover text-center">
                 <thead class="table-dark">
                     <tr>
                         <th>ID</th>
@@ -52,7 +47,6 @@
                         <td>{{ e.sede }}</td>
                         <td class="text-uppercase">{{ e.serial }}</td>
                         <td>{{ e.tipo_equipo }}</td>
-
                         <td>
                             {% if e.estado == "Operativo" %}
                                 <span class="badge bg-success">Operativo</span>
@@ -62,47 +56,16 @@
                                 <span class="badge bg-secondary">{{ e.estado }}</span>
                             {% endif %}
                         </td>
-
-                        <td class="text-nowrap">
-
-                            <!-- Editar -->
-                            <a class="btn btn-sm btn-primary mb-1"
-                               href="{{ url_for('equipo_editar', id=e.id) }}">
-                                ✏️ Editar
-                            </a>
-
-                            <!-- Historial -->
-                            <a class="btn btn-sm btn-info mb-1"
-                               href="{{ url_for('ver_historial', equipo_id=e.id) }}">
-                                📄 Historial
-                            </a>
-
-                            <!-- Mover Sede -->
-                            <a class="btn btn-sm btn-warning mb-1"
-                               href="{{ url_for('mover_equipo', equipo_id=e.id) }}">
-                                🔁 Mover Sede
-                            </a>
-
-                            <!-- Registrar Mantenimiento -->
-                            <a class="btn btn-sm btn-success mb-1"
-                               href="{{ url_for('nuevo_mantenimiento_desde_equipo', equipo_id=e.id) }}">
-                                🛠 Registrar
-                            </a>
-
-                            <!-- Tareas Pendientes (nueva integración) -->
-                            <a class="btn btn-sm btn-secondary"
-                               href="{{ url_for('tareas_equipo', equipo_id=e.id) }}">
-                                ✅ Tareas
-                            </a>
-
+                        <td>
+                            <a class="btn btn-sm btn-primary" href="{{ url_for('equipo_editar', id=e.id) }}">✏️ Editar</a>
+                            <a class="btn btn-sm btn-info" href="{{ url_for('ver_historial', equipo_id=e.id) }}">📄 Historial</a>
+                            <a class="btn btn-sm btn-warning" href="{{ url_for('mover_equipo', equipo_id=e.id) }}">🔁 Mover Sede</a>
+                            <a class="btn btn-sm btn-success" href="{{ url_for('nuevo_mantenimiento_desde_equipo', equipo_id=e.id) }}">🛠 Registrar Mantenimiento</a>
                         </td>
                     </tr>
-
                 {% else %}
                     <tr>
-                        <td colspan="8" class="text-muted py-3">
-                            No hay equipos registrados
-                        </td>
+                        <td colspan="8" class="text-muted">No hay equipos registrados para esta empresa</td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -111,11 +74,8 @@
         </div>
     </div>
 
-    <!-- BOTÓN VOLVER -->
     <div class="text-center mt-3">
-        <a href="{{ url_for('principal') }}" class="btn btn-dark btn-lg">
-            ⬅️ Volver al panel
-        </a>
+        <a href="{{ url_for('principal') }}" class="btn btn-dark">⬅️ Volver al menú</a>
     </div>
 
 </div>
