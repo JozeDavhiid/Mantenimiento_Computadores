@@ -442,29 +442,39 @@ def ver_historial(equipo_id):
 @app.route('/mover_equipo/<int:equipo_id>', methods=['GET', 'POST'])
 @login_required
 def mover_equipo(equipo_id):
-    empresa_id = session.get('empresa_id')
-
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM equipos WHERE id=%s AND empresa_id=%s", (equipo_id, empresa_id))
-    equipo = c.fetchone()
 
-    if not equipo:
-        conn.close()
-        flash("⚠️ Equipo no encontrado", "warning")
-        return redirect(url_for('equipos'))
+    if request.method == 'POST':
+        nueva_sede = request.form.get('nueva_sede')
 
-    if request.method == "POST":
-        nueva_sede = request.form.get("sede")
-        c.execute("UPDATE equipos SET sede=%s WHERE id=%s AND empresa_id=%s", (nueva_sede, equipo_id, empresa_id))
+        c.execute("""
+            UPDATE inventario SET sede=%s WHERE id=%s
+        """, (nueva_sede, equipo_id))
+
+        # Registrar en historial automático
+        c.execute("""
+            INSERT INTO historial_equipos (equipo_id, sede, accion, fecha)
+            VALUES (%s, %s, 'Cambio de sede', NOW())
+        """, (equipo_id, nueva_sede))
+
         conn.commit()
         conn.close()
 
-        flash("✅ Equipo movido correctamente", "success")
+        flash('✅ Equipo movido correctamente a la sede: ' + nueva_sede, 'success')
         return redirect(url_for('equipos'))
 
+    # GET → cargar página
+    c.execute("SELECT * FROM inventario WHERE id=%s", (equipo_id,))
+    equipo = c.fetchone()
+
     conn.close()
-    return render_template("mover_equipo.html", equipo=equipo)
+
+    if not equipo:
+        flash('⚠ Equipo no encontrado', 'danger')
+        return redirect(url_for('equipos'))
+
+    return render_template('mover_equipo.html', equipo=equipo)
 
 @app.route('/mantenimiento_equipo/<int:equipo_id>', methods=['GET', 'POST'])
 @login_required
@@ -537,55 +547,6 @@ def exportar_historial_equipo(equipo_id):
         download_name=f"Historial_{nombre_maquina}.xlsx",
         as_attachment=True
     )
-
-@app.route('/mover_equipo/<int:equipo_id>', methods=['GET', 'POST'])
-@login_required
-def mover_equipo(equipo_id):
-    conn = get_db_connection()
-    c = conn.cursor()
-
-    empresa_id = session.get('empresa_id')
-
-    # Obtener equipo
-    c.execute("""
-        SELECT * FROM mantenimiento
-        WHERE id=%s AND empresa_id=%s
-    """, (equipo_id, empresa_id))
-    equipo = c.fetchone()
-
-    if not equipo:
-        flash("❌ Equipo no encontrado para esta empresa.", "danger")
-        conn.close()
-        return redirect(url_for('equipos'))
-
-    # Obtener lista de sedes
-    c.execute("""
-        SELECT DISTINCT sede
-        FROM mantenimiento
-        WHERE empresa_id=%s
-        ORDER BY sede
-    """, (empresa_id,))
-    sedes = [s['sede'] for s in c.fetchall()]
-
-    if request.method == "POST":
-        nueva_sede = request.form.get("nueva_sede", "").strip()
-
-        if not nueva_sede:
-            flash("⚠️ Debes seleccionar una sede.", "warning")
-        else:
-            c.execute("""
-                UPDATE mantenimiento
-                SET sede=%s
-                WHERE id=%s
-            """, (nueva_sede, equipo_id))
-
-            conn.commit()
-            flash("✅ Equipo movido correctamente.", "success")
-            conn.close()
-            return redirect(url_for('equipos'))
-
-    conn.close()
-    return render_template('mover_equipo.html', equipo=equipo, sedes=sedes)
 
 @app.route('/mantenimiento_equipo/<int:equipo_id>', methods=['GET', 'POST'])
 @login_required
