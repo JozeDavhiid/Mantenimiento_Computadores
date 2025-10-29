@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -50,12 +49,23 @@
     {% endif %}
   {% endwith %}
 
+  <!-- ✅ MENÚ RÁPIDO -->
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    <a href="{{ url_for('equipos') }}" class="btn btn-outline-dark">📦 Inventario de Equipos</a>
+    <a href="{{ url_for('equipo_nuevo') }}" class="btn btn-outline-success">➕ Registrar Equipo</a>
+    <a href="{{ url_for('exportar_inventario') }}" class="btn btn-outline-primary">📤 Exportar Inventario</a>
+
+    {% if rol == 'admin' %}
+    <a href="{{ url_for('registro') }}" class="btn btn-secondary">Registrar Técnico</a>
+    <a href="{{ url_for('admin_ciclos') }}" class="btn btn-dark">⚙️ Ciclos</a>
+    {% endif %}
+  </div>
+
   <!-- ✅ FORMULARIO REGISTRO -->
   <div class="card shadow mb-4">
     <div class="card-header bg-primary text-white fw-bold">Registrar Nuevo Mantenimiento</div>
     <div class="card-body">
       
-      <!-- Si el ciclo está cerrado o no existe -->
       {% if not ciclo_activo %}
         <div class="alert alert-warning fw-bold">
           ⚠️ No hay un ciclo activo para tu empresa. Solicita al administrador abrir uno para continuar.
@@ -200,7 +210,10 @@
 
         <div class="d-flex justify-content-start gap-2 mt-3 col-12">
           <button type="submit" class="btn btn-primary">Guardar</button>
+
           <a href="{{ url_for('consultar') }}" class="btn btn-info">Consultar Registros</a>
+          <a href="{{ url_for('equipos') }}" class="btn btn-outline-dark">📦 Inventario</a>
+
           {% if rol == 'admin' %}
             <a href="{{ url_for('registro') }}" class="btn btn-secondary">Registrar Técnico</a>
             <a href="{{ url_for('exportar') }}" class="btn btn-success">Exportar Excel</a>
@@ -373,11 +386,10 @@
   </div>
 </div>
 
-<!-- ✅ SCRIPTS -->
+<!-- SCRIPTS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-
   const sedeLabels = {{ sede_labels|tojson }};
   const sedeCounts = {{ sede_counts|tojson }};
   const equipoLabels = {{ equipo_labels|tojson }};
@@ -410,7 +422,6 @@ document.addEventListener('DOMContentLoaded', function() {
     data: { labels: marcaLabels, datasets: [{ data: marcaCounts, backgroundColor: '#20c997' }] },
     options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } } }
   });
-
 });
 </script>
 </body>

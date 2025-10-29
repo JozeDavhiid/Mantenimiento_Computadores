@@ -318,113 +318,175 @@ def logout():
 @login_required
 def equipos():
     empresa_id = session.get('empresa_id')
+    buscar = request.args.get('buscar', '')
+
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM equipos WHERE empresa_id = %s ORDER BY sede, nombre_maquina", (empresa_id,))
+
+    query = """
+        SELECT * FROM equipos
+        WHERE empresa_id=%s
+    """
+    params = [empresa_id]
+
+    if buscar:
+        query += """
+            AND (
+                serial ILIKE %s OR
+                usuario_equipo ILIKE %s OR
+                sede ILIKE %s OR
+                nombre_maquina ILIKE %s
+            )
+        """
+        search = f"%{buscar}%"
+        params += [search, search, search, search]
+
+    c.execute(query, tuple(params))
     equipos = c.fetchall()
     conn.close()
 
-    return render_template('equipos.html', equipos=equipos)
+    return render_template("equipos.html", equipos=equipos)
+
 
 @app.route('/equipo_nuevo', methods=['GET', 'POST'])
 @login_required
 def equipo_nuevo():
     empresa_id = session.get('empresa_id')
-    if request.method == 'POST':
-        datos = (
-            request.form['nombre_maquina'],
-            request.form['usuario_equipo'],
-            request.form['sede'],
-            request.form['marca'],
-            request.form['modelo'],
-            request.form['serial'],
-            request.form['activo_fijo'],
-            request.form['tipo_equipo'],
-            empresa_id
-        )
+
+    if request.method == "POST":
+        nombre = request.form.get("nombre_maquina")
+        usuario = request.form.get("usuario_equipo")
+        sede = request.form.get("sede")
+        serial = request.form.get("serial")
+        tipo = request.form.get("tipo_equipo")
+        estado = request.form.get("estado", "Operativo")
+
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("""
-            INSERT INTO equipos (nombre_maquina, usuario_equipo, sede, marca, modelo, serial, activo_fijo, tipo_equipo, empresa_id)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-        """, datos)
+            INSERT INTO equipos (nombre_maquina, usuario_equipo, sede, serial, tipo_equipo, estado, empresa_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (nombre, usuario, sede, serial, tipo, estado, empresa_id))
         conn.commit()
         conn.close()
-        flash('✅ Equipo registrado correctamente', 'success')
-        return redirect(url_for('equipos'))
-    
-    return render_template('equipo_nuevo.html')
 
-@app.route('/equipo_editar/<int:id>', methods=['GET','POST'])
+        flash("✅ Equipo registrado correctamente", "success")
+        return redirect(url_for("equipos"))
+
+    return render_template("equipo_nuevo.html")
+
+@app.route('/equipo_editar/<int:id>', methods=['GET', 'POST'])
 @login_required
 def equipo_editar(id):
-    empresa_id = session.get('empresa_id')
+    empresa_id = session.get("empresa_id")
+
     conn = get_db_connection()
     c = conn.cursor()
-
     c.execute("SELECT * FROM equipos WHERE id=%s AND empresa_id=%s", (id, empresa_id))
     equipo = c.fetchone()
 
     if not equipo:
-        flash('⚠️ Equipo no encontrado', 'warning')
-        return redirect(url_for('equipos'))
+        conn.close()
+        flash("⚠️ Equipo no encontrado o no pertenece a tu empresa", "warning")
+        return redirect(url_for("equipos"))
 
-    if request.method == 'POST':
-        campos = [
-            'nombre_maquina','usuario_equipo','sede','marca','modelo','serial',
-            'activo_fijo','tipo_equipo','estado'
-        ]
-        valores = [request.form.get(campo,'') for campo in campos]
-        valores.append(id)
+    if request.method == "POST":
+        nombre = request.form.get("nombre_maquina")
+        usuario = request.form.get("usuario_equipo")
+        sede = request.form.get("sede")
+        serial = request.form.get("serial")
+        tipo = request.form.get("tipo_equipo")
+        estado = request.form.get("estado")
 
         c.execute("""
-            UPDATE equipos SET
-                nombre_maquina=%s, usuario_equipo=%s, sede=%s, marca=%s,
-                modelo=%s, serial=%s, activo_fijo=%s, tipo_equipo=%s, estado=%s
-            WHERE id=%s
-        """, valores)
+            UPDATE equipos
+            SET nombre_maquina=%s, usuario_equipo=%s, sede=%s, serial=%s, tipo_equipo=%s, estado=%s
+            WHERE id=%s AND empresa_id=%s
+        """, (nombre, usuario, sede, serial, tipo, estado, id, empresa_id))
 
         conn.commit()
         conn.close()
-        flash('✅ Equipo actualizado correctamente', 'success')
+        flash("✅ Equipo actualizado", "success")
         return redirect(url_for('equipos'))
 
     conn.close()
-    return render_template('equipo_editar.html', equipo=equipo)
+    return render_template("equipo_editar.html", equipo=equipo)
 
 @app.route('/historial/<int:equipo_id>')
 @login_required
 def ver_historial(equipo_id):
+    empresa_id = session.get("empresa_id")
     conn = get_db_connection()
     c = conn.cursor()
 
-    empresa_id = session.get('empresa_id')
-
-    # ✅ Obtener equipo solo si pertenece a la empresa actual
-    c.execute("""
-        SELECT *
-        FROM mantenimiento
-        WHERE id=%s AND empresa_id=%s
-    """, (equipo_id, empresa_id))
+    # Datos del equipo
+    c.execute("SELECT * FROM equipos WHERE id=%s AND empresa_id=%s", (equipo_id, empresa_id))
     equipo = c.fetchone()
 
     if not equipo:
-        flash("⚠️ Este equipo no pertenece a tu empresa o no existe.", "danger")
         conn.close()
+        flash("⚠️ Equipo no encontrado", "warning")
         return redirect(url_for('equipos'))
 
-    # ✅ Obtener historial de mantenimientos
+    # Historial
     c.execute("""
-        SELECT id, fecha, observaciones, tecnico, ciclo_id, cerrado
-        FROM mantenimiento
-        WHERE nombre_maquina=%s AND empresa_id=%s
+        SELECT * FROM mantenimiento
+        WHERE serial=%s AND empresa_id=%s
         ORDER BY fecha DESC
-    """, (equipo['nombre_maquina'], empresa_id))
-
+    """, (equipo['serial'], empresa_id))
     historial = c.fetchall()
     conn.close()
 
-    return render_template("historial_equipo.html", equipo=equipo, historial=historial)
+    return render_template("historial.html", equipo=equipo, historial=historial)
+
+@app.route('/mover_equipo/<int:equipo_id>', methods=['GET', 'POST'])
+@login_required
+def mover_equipo(equipo_id):
+    empresa_id = session.get('empresa_id')
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM equipos WHERE id=%s AND empresa_id=%s", (equipo_id, empresa_id))
+    equipo = c.fetchone()
+
+    if not equipo:
+        conn.close()
+        flash("⚠️ Equipo no encontrado", "warning")
+        return redirect(url_for('equipos'))
+
+    if request.method == "POST":
+        nueva_sede = request.form.get("sede")
+        c.execute("UPDATE equipos SET sede=%s WHERE id=%s AND empresa_id=%s", (nueva_sede, equipo_id, empresa_id))
+        conn.commit()
+        conn.close()
+
+        flash("✅ Equipo movido correctamente", "success")
+        return redirect(url_for('equipos'))
+
+    conn.close()
+    return render_template("mover_equipo.html", equipo=equipo)
+
+@app.route('/mantenimiento_equipo/<int:equipo_id>', methods=['GET', 'POST'])
+@login_required
+def nuevo_mantenimiento_desde_equipo(equipo_id):
+    empresa_id = session.get("empresa_id")
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM equipos WHERE id=%s AND empresa_id=%s", (equipo_id, empresa_id))
+    equipo = c.fetchone()
+
+    if not equipo:
+        conn.close()
+        flash("⚠️ Equipo no encontrado", "warning")
+        return redirect(url_for("equipos"))
+
+    if request.method == "POST":
+        # guardar mantenimiento usando datos precargados del equipo
+        pass # <- lo hacemos si quieres
+
+    conn.close()
+    return render_template("mantenimiento_equipo.html", equipo=equipo)
 
 @app.route('/exportar_historial_equipo/<int:equipo_id>')
 @login_required
@@ -528,41 +590,52 @@ def mover_equipo(equipo_id):
 @app.route('/mantenimiento_equipo/<int:equipo_id>', methods=['GET', 'POST'])
 @login_required
 def nuevo_mantenimiento_desde_equipo(equipo_id):
+    empresa_id = session.get("empresa_id")
+    tecnico = session.get("nombre")
+
     conn = get_db_connection()
     c = conn.cursor()
 
-    empresa_id = session.get('empresa_id')
-
-    c.execute("""
-        SELECT * FROM mantenimiento
-        WHERE id=%s AND empresa_id=%s
-    """, (equipo_id, empresa_id))
+    # Buscar equipo
+    c.execute("SELECT * FROM equipos WHERE id=%s AND empresa_id=%s", (equipo_id, empresa_id))
     equipo = c.fetchone()
 
     if not equipo:
-        flash("Equipo no encontrado", "danger")
         conn.close()
-        return redirect(url_for('equipos'))
+        flash("⚠️ Equipo no encontrado o no pertenece a tu empresa", "warning")
+        return redirect(url_for("equipos"))
 
-    if request.method == 'POST':
-        sede = equipo['sede']
-        nombre = equipo['nombre_maquina']
-        usuario = equipo['usuario_equipo']
-        tecnico = session.get('nombre')
-        fecha = date.today()
+    # Buscar ciclo activo
+    c.execute("SELECT id FROM ciclos WHERE empresa_id=%s AND activo=true ORDER BY id DESC LIMIT 1", (empresa_id,))
+    ciclo = c.fetchone()
+    ciclo_id = ciclo['id'] if ciclo else None
+
+    if request.method == "POST":
+        fecha = request.form.get("fecha")
+        observaciones = request.form.get("observaciones", "")
 
         c.execute("""
-            INSERT INTO mantenimiento (sede, fecha, nombre_maquina, usuario, tecnico, empresa_id)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (sede, fecha, nombre, usuario, tecnico, empresa_id))
+            INSERT INTO mantenimiento (
+                sede, fecha, area, nombre_maquina, usuario, tipo_equipo, marca, modelo,
+                serial, sistema_operativo, office, antivirus, compresor, control_remoto,
+                activo_fijo, observaciones, tecnico, empresa_id, ciclo_id
+            )
+            VALUES (%s, %s, '', %s, %s, %s, %s, %s,
+                    %s, %s, '', '', '', '',
+                    %s, %s, %s, %s, %s)
+        """, (
+            equipo['sede'], fecha, equipo['nombre_maquina'], equipo['usuario_equipo'], equipo['tipo_equipo'],
+            equipo['marca'], equipo['modelo'], equipo['serial'], equipo.get('so', 'N/A'),
+            equipo.get('activo_fijo', ''), observaciones, tecnico, empresa_id, ciclo_id
+        ))
 
         conn.commit()
         conn.close()
-        flash("✅ Mantenimiento creado desde inventario", "success")
-        return redirect(url_for('equipos'))
+        flash("✅ Mantenimiento registrado correctamente", "success")
+        return redirect(url_for("principal"))
 
     conn.close()
-    return render_template("nuevo_mantenimiento_desde_equipo.html", equipo=equipo)
+    return render_template("mantenimiento_equipo.html", equipo=equipo, ciclo_id=ciclo_id)
 
 @app.route('/exportar_inventario')
 @login_required
