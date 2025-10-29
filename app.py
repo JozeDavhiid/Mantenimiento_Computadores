@@ -7,15 +7,16 @@ from datetime import datetime, timedelta, date
 from functools import wraps
 
 # Flask
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, Response
 
 # PostgreSQL (psycopg3)
 import psycopg
 from psycopg.rows import dict_row
 from psycopg import errors as psycopg_errors
 
-# Archivos Excel
-import openpyxl
+# Excel con openpyxl ✅
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment
 
 # PDF (ReportLab)
 from reportlab.lib.pagesizes import letter
@@ -579,34 +580,61 @@ def nuevo_mantenimiento_desde_equipo(equipo_id):
 @app.route('/exportar_inventario')
 @login_required
 def exportar_inventario():
-    import pandas as pd
-    from io import BytesIO
-    from flask import send_file
 
     empresa_id = session.get('empresa_id')
 
+    if not empresa_id:
+        flash("No hay empresa activa en sesión.", "warning")
+        return redirect(url_for("equipos"))
+
     conn = get_db_connection()
+    c = conn.cursor()
 
-    df = pd.read_sql_query("""
-        SELECT sede, nombre_maquina, usuario, tipo_equipo, marca, modelo, serial, sistema_operativo,
-               office, antivirus, fecha, tecnico
-        FROM mantenimiento
-        WHERE empresa_id=%s
-        ORDER BY sede, nombre_maquina
-    """, conn, params=(empresa_id,))
+    c.execute("""
+        SELECT id, nombre_maquina, usuario_equipo, sede, serial, tipo_equipo, estado
+        FROM inventario
+        WHERE empresa_id = %s
+        ORDER BY id ASC
+    """, (empresa_id,))
 
+    equipos = c.fetchall()
     conn.close()
 
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name="Inventario")
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Inventario"
 
+    # Encabezados
+    headers = ["ID", "Nombre", "Usuario", "Sede", "Serial", "Tipo", "Estado"]
+    ws.append(headers)
+
+    # Dar estilo a encabezados
+    for col in ws[1]:
+        col.font = Font(bold=True)
+        col.alignment = Alignment(horizontal="center")
+
+    # Agregar filas
+    for e in equipos:
+        ws.append([
+            e["id"],
+            e["nombre_maquina"],
+            e["usuario_equipo"],
+            e["sede"],
+            e["serial"],
+            e["tipo_equipo"],
+            e["estado"]
+        ])
+
+    # Guardar en memoria
+    output = BytesIO()
+    wb.save(output)
     output.seek(0)
 
     return send_file(
         output,
-        download_name="Inventario_Computadores.xlsx",
-        as_attachment=True
+        download_name="inventario.xlsx",
+        as_attachment=True,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
 @app.route('/tareas/<int:equipo_id>', methods=['GET', 'POST'])
