@@ -476,28 +476,6 @@ def mover_equipo(equipo_id):
 
     return render_template('mover_equipo.html', equipo=equipo)
 
-@app.route('/mantenimiento_equipo/<int:equipo_id>', methods=['GET', 'POST'])
-@login_required
-def nuevo_mantenimiento_desde_equipo(equipo_id):
-    empresa_id = session.get("empresa_id")
-
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM equipos WHERE id=%s AND empresa_id=%s", (equipo_id, empresa_id))
-    equipo = c.fetchone()
-
-    if not equipo:
-        conn.close()
-        flash("⚠️ Equipo no encontrado", "warning")
-        return redirect(url_for("equipos"))
-
-    if request.method == "POST":
-        # guardar mantenimiento usando datos precargados del equipo
-        pass # <- lo hacemos si quieres
-
-    conn.close()
-    return render_template("mantenimiento_equipo.html", equipo=equipo)
-
 @app.route('/exportar_historial_equipo/<int:equipo_id>')
 @login_required
 def exportar_historial_equipo(equipo_id):
